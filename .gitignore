@@ -1,0 +1,14 @@
+# Ignore TIFF and large data files
+data/*.tif
+*.tif
+
+# Ignore unnecessary system files
+.DS_Store
+Thumbs.db
+
+# Ignore Python cache and environment files
+__pycache__/
+*.pyc
+*.pyo
+env/
+venv/
