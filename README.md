@@ -24,12 +24,3 @@ HR-SAGE is a **geospatial decision support system** designed to help **sugarcane
 2. **Process spectral signatures** to classify sugarcane growth stages.
 3. **Use QGIS mapping** to visualize harvest-ready areas.
 4. **Display interactive maps** via a React-based web application.
-
-## 📌 Getting Started
-
-### 1️⃣ Clone the repository
-
-```sh
-git clone https://github.com/yourusername/HR-SAGE.git
-cd HR-SAGE
-```
