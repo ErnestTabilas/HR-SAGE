@@ -122,8 +122,8 @@ const CheckHarvest = () => {
                   center={[location.lat, location.lng]}
                   radius={5}
                   pathOptions={{
-                    color: "yellow",
-                    fillColor: "green",
+                    color: location.color, // Use color from backend
+                    fillColor: location.color,
                     fillOpacity: 0.5,
                   }}
                 />
