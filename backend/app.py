@@ -1,121 +1,83 @@
-from flask import Flask, jsonify, Response
-from flask_cors import CORS
-import psycopg2
+import os
 import rasterio
-import numpy as np
-from io import BytesIO
+from flask import Flask, jsonify
+from flask_cors import CORS
+import logging
+
+# Set up basic logging
+logging.basicConfig(level=logging.DEBUG)
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend requests
+CORS(app)
 
-# ✅ Database connection settings
-DB_SETTINGS = {
-    "dbname": "hr_sage",
-    "user": "postgres",
-    "password": "ernest",
-    "host": "localhost",
-    "port": "5432"
-}
+# Get the current working directory (where app.py is located)
+current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# ✅ Function to get the latest NDVI raster
-def get_latest_ndvi():
-    conn = psycopg2.connect(**DB_SETTINGS)
-    cur = conn.cursor()
-    
-    # ✅ Ensure correct column name (`rast`)
-    cur.execute("SELECT ST_AsTIFF(rast) FROM ndvi_data ORDER BY rid DESC LIMIT 1;")
-    result = cur.fetchone()
-    
-    cur.close()
-    conn.close()
-    
-    if result and result[0]:
-        return result[0]  # ✅ Returns the raster as binary
-    return None
+# Construct the relative path to the GeoTIFF file in the data folder
+geotiff_path = os.path.join(current_dir, '..', 'data', 'NDVI_Negros.tif')
 
-# ✅ Endpoint: Fetch the latest NDVI raster as TIFF
-@app.route('/get-latest-ndvi', methods=['GET'])
-def latest_ndvi():
-    """Fetch the latest NDVI raster as TIFF."""
-    ndvi_data = get_latest_ndvi()
+@app.route('/ndvi-data', methods=['GET'])
+def get_ndvi_data():
+    try:
+        logging.debug("Opening GeoTIFF file at: %s", geotiff_path)
+        
+        # Check if the file exists
+        if not os.path.exists(geotiff_path):
+            logging.error("GeoTIFF file not found at: %s", geotiff_path)
+            return jsonify({"error": "GeoTIFF file not found"}), 500
+        
+        # Open the local GeoTIFF file
+        with rasterio.open(geotiff_path) as src:
+            logging.debug("GeoTIFF file opened successfully.")
+            
+            # Get image bounds (min and max lat/lon)
+            bounds = src.bounds
+            min_lon, min_lat, max_lon, max_lat = bounds
 
-    if ndvi_data:
-        return Response(ndvi_data, mimetype="image/tiff", headers={"Content-Length": str(len(ndvi_data))})
-    else:
-        return jsonify({"error": "No NDVI data found"}), 404
+            # Return the bounds to the frontend for map adjustment
+            return jsonify({
+                "min_lon": min_lon,
+                "min_lat": min_lat,
+                "max_lon": max_lon,
+                "max_lat": max_lat
+            })
 
-# ✅ Fetch NDVI metadata (Bounding Box)
-@app.route('/get-ndvi-info', methods=['GET'])
-def get_ndvi_info():
-    """Fetch the latest NDVI raster along with its bounding box."""
-    conn = psycopg2.connect(**DB_SETTINGS)
-    cur = conn.cursor()
-    
-    # ✅ Convert raster to geometry before extracting bounding box
-    cur.execute("""
-        SELECT 
-               ST_XMin(ST_ConvexHull(rast))::float, 
-               ST_YMin(ST_ConvexHull(rast))::float, 
-               ST_XMax(ST_ConvexHull(rast))::float, 
-               ST_YMax(ST_ConvexHull(rast))::float
-        FROM ndvi_data
-        ORDER BY rid DESC
-        LIMIT 1;
-    """)
-    
-    result = cur.fetchone()
-    cur.close()
-    conn.close()
+    except Exception as e:
+        logging.error("Error in /ndvi-data endpoint: %s", str(e))
+        return jsonify({"error": str(e)}), 500
 
-    if result:
-        bbox = {
-            "southwest": [result[1], result[0]],  # (YMin, XMin)
-            "northeast": [result[3], result[2]]   # (YMax, XMax)
-        }
-        return jsonify(bbox)
-    else:
-        return jsonify({"error": "No NDVI metadata found"}), 404
+@app.route("/sugarcane-locations", methods=["GET"])
+def get_sugarcane_locations():
+    try:
+        logging.debug("Opening GeoTIFF file at: %s", geotiff_path)
+        
+        # Open the local GeoTIFF file
+        with rasterio.open(geotiff_path) as src:
+            logging.debug("GeoTIFF file opened successfully.")
+            
+            # Read the raster data into a numpy array
+            raster_data = src.read(1)  # Read the first band (assuming it's a single-band raster)
+            transform = src.transform
 
-# ✅ Fetch & Classify NDVI for Growth Stages
-@app.route('/get-ndvi-classified', methods=['GET'])
-def get_ndvi_classified():
-    """Fetch NDVI raster and classify pixels into sugarcane growth stages."""
-    conn = psycopg2.connect(**DB_SETTINGS)
-    cur = conn.cursor()
+            # Identify sugarcane locations where NDVI > 0.1 (threshold can be adjusted)
+            threshold = 0.1
+            sugarcane_mask = raster_data > threshold
 
-    # ✅ Extract NDVI raster as an array
-    cur.execute("SELECT ST_AsGDALRaster(rast, 'GTiff') FROM ndvi_data ORDER BY rid DESC LIMIT 1;")
-    result = cur.fetchone()
-    
-    cur.close()
-    conn.close()
+            # Extract the coordinates of the detected sugarcane locations
+            sugarcane_locations = []
+            for row in range(sugarcane_mask.shape[0]):
+                for col in range(sugarcane_mask.shape[1]):
+                    if sugarcane_mask[row, col]:
+                        # Convert pixel coordinates (row, col) to geographical coordinates
+                        lon, lat = transform * (col, row)
+                        sugarcane_locations.append({"lat": lat, "lng": lon})
 
-    if not result or not result[0]:
-        return jsonify({"error": "No NDVI data found"}), 404
+            logging.debug("Found %d sugarcane locations.", len(sugarcane_locations))
+            return jsonify(sugarcane_locations)
 
-    # ✅ Convert raster to NumPy array
-    with rasterio.open(BytesIO(result[0])) as dataset:
-        ndvi_array = dataset.read(1)  # Read band 1 (NDVI values)
-    
-    # ✅ Classify NDVI into sugarcane growth stages
-    classified_ndvi = np.zeros_like(ndvi_array, dtype=np.uint8)
-
-    classified_ndvi[(ndvi_array >= 0.1) & (ndvi_array < 0.2)] = 1  # Germination (Yellow)
-    classified_ndvi[(ndvi_array >= 0.2) & (ndvi_array < 0.4)] = 2  # Tillering (Orange)
-    classified_ndvi[(ndvi_array >= 0.5) & (ndvi_array < 0.7)] = 3  # Grand Growth (Green)
-    classified_ndvi[(ndvi_array >= 0.3) & (ndvi_array < 0.5)] = 4  # Ripening (Red)
-
-    # ✅ Convert classified NDVI to a new GeoTIFF
-    out_raster = BytesIO()
-    with rasterio.open(
-        out_raster, 'w', driver='GTiff', height=dataset.height, width=dataset.width,
-        count=1, dtype=rasterio.uint8, crs=dataset.crs, transform=dataset.transform
-    ) as dst:
-        dst.write(classified_ndvi, 1)
-
-    out_raster.seek(0)
-    
-    return Response(out_raster.read(), mimetype="image/tiff", headers={"Content-Length": str(out_raster.getbuffer().nbytes)})
+    except Exception as e:
+        logging.error("Error in /sugarcane-locations endpoint: %s", str(e))
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True)

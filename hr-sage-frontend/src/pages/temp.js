@@ -1,11 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  ImageOverlay,
-  useMap,
-  CircleMarker,
-} from "react-leaflet";
+import { MapContainer, TileLayer, ImageOverlay, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
@@ -57,38 +51,33 @@ const MapBoundsAdjuster = ({ bounds }) => {
 const CheckHarvest = () => {
   const [ndviUrl, setNdviUrl] = useState(null);
   const [bounds, setBounds] = useState(null);
-  const [sugarcaneLocations, setSugarcaneLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const mapRef = useRef(null);
 
   useEffect(() => {
     setLoading(true);
 
-    // Fetch NDVI metadata to get map bounds
     axios
-      .get("http://127.0.0.1:5000/ndvi-data")
+      .get("http://127.0.0.1:5000/get-ndvi-info")
       .then((response) => {
-        const { min_lon, min_lat, max_lon, max_lat } = response.data;
-        // Construct bounds for Leaflet
-        const mapBounds = [
-          [min_lat, min_lon], // Bottom-left corner
-          [max_lat, max_lon], // Top-right corner
-        ];
-        setBounds(mapBounds);
+        const { southwest, northeast } = response.data;
+        setBounds([
+          [southwest.lat, southwest.lon],
+          [northeast.lat, northeast.lon],
+        ]);
       })
       .catch((error) => console.error("Error fetching NDVI metadata:", error));
 
-    // Fetch sugarcane locations
     axios
-      .get("http://127.0.0.1:5000/sugarcane-locations")
-      .then((response) => {
-        const locations = Array.isArray(response.data) ? response.data : [];
-        setSugarcaneLocations(locations);
-        setLoading(false);
+      .get("http://127.0.0.1:5000/get-ndvi-classified", {
+        responseType: "blob",
       })
-      .catch((error) =>
-        console.error("Error fetching sugarcane locations:", error)
-      );
+      .then((response) => {
+        const url = URL.createObjectURL(response.data);
+        setNdviUrl(url);
+      })
+      .catch((error) => console.error("Error fetching NDVI:", error))
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -105,8 +94,9 @@ const CheckHarvest = () => {
           </div>
         ) : (
           <MapContainer
-            style={{ height: "100vh", width: "100%" }}
-            bounds={bounds} // Set map bounds here
+            center={[14.0488, 121.2799]}
+            zoom={13}
+            className="h-full w-full"
             ref={mapRef}
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -114,20 +104,6 @@ const CheckHarvest = () => {
             {ndviUrl && bounds && (
               <ImageOverlay url={ndviUrl} bounds={bounds} opacity={0.7} />
             )}
-            {/* Render sugarcane locations as circles */}
-            {!loading &&
-              sugarcaneLocations.map((location, index) => (
-                <CircleMarker
-                  key={index}
-                  center={[location.lat, location.lng]}
-                  radius={5}
-                  pathOptions={{
-                    color: "yellow",
-                    fillColor: "green",
-                    fillOpacity: 0.5,
-                  }}
-                />
-              ))}
           </MapContainer>
         )}
       </div>
