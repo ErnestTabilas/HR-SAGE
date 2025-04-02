@@ -28,7 +28,8 @@ const App = () => {
 const MainContent = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const location = useLocation(); // Now inside Router
+  const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
+  const location = useLocation();
 
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);
@@ -38,7 +39,14 @@ const MainContent = () => {
     setNotificationOpen(!notificationOpen);
   };
 
-  // Function to check if the link is active
+  const handleSearchFocus = () => {
+    setSearchDropdownOpen(true);
+  };
+
+  const handleSearchBlur = () => {
+    setTimeout(() => setSearchDropdownOpen(false), 200);
+  };
+
   const isActive = (path) => (location.pathname === path ? "bg-green-500" : "");
 
   return (
@@ -50,7 +58,6 @@ const MainContent = () => {
             className="text-white text-2xl cursor-pointer mr-4"
             onClick={toggleMenu}
           />
-          {/* Logo */}
           <img
             src="/logo.png"
             alt="HR-SAGE Logo"
@@ -75,12 +82,14 @@ const MainContent = () => {
             </Link>
           </nav>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-4 relative">
           <div className="relative">
             <input
               type="text"
               placeholder="Search..."
               className="px-4 py-2 rounded-lg text-black"
+              onFocus={handleSearchFocus}
+              onBlur={handleSearchBlur}
             />
             <FontAwesomeIcon
               icon={faSearch}
@@ -93,10 +102,22 @@ const MainContent = () => {
               className="text-white text-2xl cursor-pointer"
             />
           </button>
+          {searchDropdownOpen && (
+            <div className="absolute top-full left-0 mt-2 bg-white shadow-lg rounded-lg p-4 w-64 z-50">
+              <div className="flex flex-col items-center justify-center">
+                <FontAwesomeIcon
+                  icon={faExclamationTriangle}
+                  className="text-gray-500 text-4xl mb-2"
+                />
+                <p className="text-gray-600 text-center">
+                  This feature is still under development.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Overlay */}
       {menuOpen && (
         <div
           className="fixed inset-0 bg-black opacity-50 z-10"
@@ -104,7 +125,6 @@ const MainContent = () => {
         ></div>
       )}
 
-      {/* Sliding Menu */}
       <div
         className={`fixed top-0 left-0 h-full bg-emerald-600 shadow-md transform ${
           menuOpen ? "translate-x-0" : "-translate-x-full"
@@ -150,7 +170,6 @@ const MainContent = () => {
         </Routes>
       </div>
 
-      {/* Notification Modal */}
       {notificationOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[100]">
           <div className="bg-white rounded-lg shadow-lg p-6 w-96">
