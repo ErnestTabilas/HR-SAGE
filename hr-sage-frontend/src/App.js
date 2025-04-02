@@ -95,7 +95,7 @@ const App = () => {
             <div className="flex justify-center items-center">
               <FontAwesomeIcon
                 icon={faTimes}
-                className="text-white font-thin text-2xl cursor-pointer px-2 hover:bg-red-500 rounded-lg transition font-thin px-4 py-2"
+                className="rounded-full text-white font-thin text-2xl cursor-pointer hover:bg-red-500 rounded-lg transition font-thin px-2 py-1"
                 onClick={toggleMenu}
               />
             </div>
@@ -127,7 +127,7 @@ const App = () => {
 
         {/* Notification Modal */}
         {notificationOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-30">
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-[100]">
             <div className="bg-white rounded-lg shadow-lg p-6 w-96">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl font-semibold">Notification</h2>

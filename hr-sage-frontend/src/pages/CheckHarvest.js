@@ -109,9 +109,9 @@ const CheckHarvest = () => {
       <div className="w-1/4 bg-gray-50 p-6 border-r border-gray-300 overflow-y-auto">
         <Legend />
       </div>
-      <div className="w-3/4 relative">
+      <div className="w-3/4 relative z-0">
         {loading ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-70">
+          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-70 z-10">
             <p className="text-lg font-semibold text-gray-700">
               Loading NDVI data...
             </p>
