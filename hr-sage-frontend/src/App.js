@@ -95,7 +95,7 @@ const App = () => {
             <div className="flex justify-center items-center">
               <FontAwesomeIcon
                 icon={faTimes}
-                className="rounded-full text-white font-thin text-2xl cursor-pointer hover:bg-red-500 rounded-lg transition font-thin px-2 py-1"
+                className="rounded-full text-white font-thin text-2xl cursor-pointer hover:bg-red-500 transition font-thin px-2 py-1"
                 onClick={toggleMenu}
               />
             </div>
@@ -133,11 +133,11 @@ const App = () => {
                 <h2 className="text-xl font-semibold">Notification</h2>
                 <FontAwesomeIcon
                   icon={faTimes}
-                  className="text-gray-600 cursor-pointer text-xl"
+                  className="text-gray-600 cursor-pointer text-xl rounded-full px-2 py-1 hover:bg-red-500 hover:text-white"
                   onClick={toggleNotification}
                 />
               </div>
-              <div className="flex flex-col items-center justify-center mt-4">
+              <div className="flex flex-col items-center justify-center mt-4 p-6">
                 <FontAwesomeIcon
                   icon={faExclamationTriangle}
                   className="text-gray-500 text-4xl mb-2"
