@@ -1,15 +1,26 @@
 import React, { useState } from "react";
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSearch, faBars, faTimes } from "@fortawesome/free-solid-svg-icons";
+import {
+  faSearch,
+  faBars,
+  faTimes,
+  faBell,
+  faExclamationTriangle,
+} from "@fortawesome/free-solid-svg-icons";
 import Home from "./pages/Home";
 import CheckHarvest from "./pages/CheckHarvest";
 
 const App = () => {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notificationOpen, setNotificationOpen] = useState(false);
 
   const toggleMenu = () => {
     setMenuOpen(!menuOpen);
+  };
+
+  const toggleNotification = () => {
+    setNotificationOpen(!notificationOpen);
   };
 
   return (
@@ -26,10 +37,24 @@ const App = () => {
             <img
               src="/logo.png"
               alt="HR-SAGE Logo"
-              className="w-16 h-14 my-4 mx-4"
+              className="w-16 h-14 my-4 mx-4 mr-20"
             />
+            <nav className="flex items-center space-x-10 py-4">
+              <Link
+                to="/"
+                className="px-6 py-2 text-lg font-semibold text-white hover:bg-green-500 rounded-lg transition font-thin"
+              >
+                Home
+              </Link>
+              <Link
+                to="/check-harvest"
+                className="px-6 py-2 text-lg font-semibold text-white hover:bg-green-500 rounded-lg transition font-thin"
+              >
+                Check Harvest
+              </Link>
+            </nav>
           </div>
-          <nav className="flex items-center space-x-10 py-4">
+          <div className="flex items-center space-x-4">
             <div className="relative">
               <input
                 type="text"
@@ -41,19 +66,13 @@ const App = () => {
                 className="absolute right-3 top-3 text-black"
               />
             </div>
-            <Link
-              to="/"
-              className="px-6 py-2 text-lg font-semibold text-white hover:bg-green-500 rounded-lg transition font-thin"
-            >
-              Home
-            </Link>
-            <Link
-              to="/check-harvest"
-              className="px-6 py-2 text-lg font-semibold text-white hover:bg-green-500 rounded-lg transition font-thin"
-            >
-              Check Harvest
-            </Link>
-          </nav>
+            <button onClick={toggleNotification} className="relative px-4">
+              <FontAwesomeIcon
+                icon={faBell}
+                className="text-white text-2xl cursor-pointer"
+              />
+            </button>
+          </div>
         </div>
 
         {/* Overlay */}
@@ -105,6 +124,31 @@ const App = () => {
             <Route path="/check-harvest" element={<CheckHarvest />} />
           </Routes>
         </div>
+
+        {/* Notification Modal */}
+        {notificationOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-30">
+            <div className="bg-white rounded-lg shadow-lg p-6 w-96">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">Notification</h2>
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  className="text-gray-600 cursor-pointer text-xl"
+                  onClick={toggleNotification}
+                />
+              </div>
+              <div className="flex flex-col items-center justify-center mt-4">
+                <FontAwesomeIcon
+                  icon={faExclamationTriangle}
+                  className="text-gray-500 text-4xl mb-2"
+                />
+                <p className="text-gray-600 text-center">
+                  This feature is still under development.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Router>
   );
