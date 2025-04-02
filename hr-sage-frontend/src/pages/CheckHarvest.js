@@ -5,6 +5,7 @@ import {
   ImageOverlay,
   useMap,
   CircleMarker,
+  Popup,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
@@ -64,21 +65,18 @@ const CheckHarvest = () => {
   useEffect(() => {
     setLoading(true);
 
-    // Fetch NDVI metadata to get map bounds
     axios
       .get("http://127.0.0.1:5000/ndvi-data")
       .then((response) => {
         const { min_lon, min_lat, max_lon, max_lat } = response.data;
-        // Construct bounds for Leaflet
         const mapBounds = [
-          [min_lat, min_lon], // Bottom-left corner
-          [max_lat, max_lon], // Top-right corner
+          [min_lat, min_lon],
+          [max_lat, max_lon],
         ];
         setBounds(mapBounds);
       })
       .catch((error) => console.error("Error fetching NDVI metadata:", error));
 
-    // Fetch sugarcane locations
     axios
       .get("http://127.0.0.1:5000/sugarcane-locations")
       .then((response) => {
@@ -90,6 +88,21 @@ const CheckHarvest = () => {
         console.error("Error fetching sugarcane locations:", error)
       );
   }, []);
+
+  const getTextColor = (growthStage) => {
+    switch (growthStage) {
+      case "Germination":
+        return "text-yellow-500";
+      case "Tillering":
+        return "text-orange-500";
+      case "Grand Growth":
+        return "text-green-500";
+      case "Ripening":
+        return "text-red-500";
+      default:
+        return "text-gray-500";
+    }
+  };
 
   return (
     <div className="flex h-screen">
@@ -106,7 +119,7 @@ const CheckHarvest = () => {
         ) : (
           <MapContainer
             style={{ height: "100vh", width: "100%" }}
-            bounds={bounds} // Set map bounds here
+            bounds={bounds}
             ref={mapRef}
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -114,7 +127,6 @@ const CheckHarvest = () => {
             {ndviUrl && bounds && (
               <ImageOverlay url={ndviUrl} bounds={bounds} opacity={0.7} />
             )}
-            {/* Render sugarcane locations as circles */}
             {!loading &&
               sugarcaneLocations.map((location, index) => (
                 <CircleMarker
@@ -122,11 +134,27 @@ const CheckHarvest = () => {
                   center={[location.lat, location.lng]}
                   radius={5}
                   pathOptions={{
-                    color: location.color, // Use color from backend
+                    color: location.color,
                     fillColor: location.color,
                     fillOpacity: 0.5,
                   }}
-                />
+                >
+                  <Popup>
+                    <div className="rounded-md text-center">
+                      <span
+                        className={`font-bold text-lg ${getTextColor(
+                          location.stage
+                        )}`}
+                      >
+                        {location.stage}
+                      </span>
+                      <br />
+                      {location.stage === "Ripening"
+                        ? "✔️ Ready for Harvest"
+                        : "⏳ Not Ready"}
+                    </div>
+                  </Popup>
+                </CircleMarker>
               ))}
           </MapContainer>
         )}

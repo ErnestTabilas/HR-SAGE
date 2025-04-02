@@ -1,5 +1,6 @@
 import os
 import rasterio
+import numpy as np
 from flask import Flask, jsonify
 from flask_cors import CORS
 import logging
@@ -14,7 +15,7 @@ CORS(app)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Construct the relative path to the GeoTIFF file in the data folder
-geotiff_path = os.path.join(current_dir, '..', 'data', 'NDVI_Negros.tif')
+geotiff_path = os.path.join(current_dir, '..', 'data', 'NDVI_Negros_Small.tif')
 
 def classify_growth_stage(ndvi_value):
     """Classify the growth stage based on NDVI value."""
@@ -72,9 +73,9 @@ def get_sugarcane_locations():
             raster_data = src.read(1)  # Read the first band (assuming it's a single-band raster)
             transform = src.transform
 
-            # Identify sugarcane locations where NDVI > 0.1 (threshold can be adjusted)
-            threshold = 0.1
-            sugarcane_mask = raster_data > threshold
+            # Ignore roads, rivers, and other non-cropland areas by applying a cropland NDVI threshold
+            sugarcane_mask = (raster_data > 0.1)  # Ignore NDVI values lower than 0.1 (non-cropland)
+            sugarcane_mask &= (raster_data <= 1.0)  # Ensure valid NDVI values (NDVI max is 1.0)
 
             # Extract the coordinates of the detected sugarcane locations
             sugarcane_locations = []
