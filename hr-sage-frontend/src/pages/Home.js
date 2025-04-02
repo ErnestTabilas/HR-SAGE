@@ -2,7 +2,7 @@ import React from "react";
 
 const Home = () => {
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-green-100 to-green-200">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-b from-green-50 to-green-200">
       {/* Logo */}
       <img
         src="/logotext.png"

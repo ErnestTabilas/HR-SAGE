@@ -105,8 +105,8 @@ const CheckHarvest = () => {
   };
 
   return (
-    <div className="flex h-screen">
-      <div className="w-1/4 bg-gray-50 p-6 border-r border-gray-300 overflow-y-auto">
+    <div className="flex h-screen ">
+      <div className="bg-gradient-to-b from-green-50 to-green-200 w-1/4 bg-gray-50 p-6 border-r border-gray-300 overflow-y-auto">
         <Legend />
       </div>
       <div className="w-3/4 relative z-0">
