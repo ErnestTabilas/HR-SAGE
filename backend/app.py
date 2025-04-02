@@ -15,18 +15,18 @@ CORS(app)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Construct the relative path to the GeoTIFF file in the data folder
-geotiff_path = os.path.join(current_dir, '..', 'data', 'NDVI_Negros_Small.tif')
+geotiff_path = os.path.join(current_dir, '..', 'data', 'NDVI_Victorias.tif')
 
 def classify_growth_stage(ndvi_value):
     """Classify the growth stage based on NDVI value."""
     if ndvi_value >= 0.5:
-        return "Grand Growth", "green"  # Grand Growth Stage (NDVI: 0.5 - 0.7)
+        return "Grand Growth", "yellow"  # Grand Growth Stage (NDVI: 0.5 - 0.7)
     elif ndvi_value >= 0.3:
-        return "Ripening", "red"  # Ripening Stage (NDVI: 0.3 - 0.5)
+        return "Ripening", "green"  # Ripening Stage (NDVI: 0.3 - 0.5)
     elif ndvi_value >= 0.2:
         return "Tillering", "orange"  # Tillering Stage (NDVI: 0.2 - 0.4)
     elif ndvi_value >= 0.1:
-        return "Germination", "yellow"  # Germination Stage (NDVI: 0.1 - 0.2)
+        return "Germination", "red"  # Germination Stage (NDVI: 0.1 - 0.2)
     else:
         return "No Sugarcane", "gray"  # No sugarcane detected (NDVI below 0.1)
 

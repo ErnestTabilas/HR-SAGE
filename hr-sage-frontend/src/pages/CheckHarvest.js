@@ -17,19 +17,19 @@ const Legend = () => (
         Sugarcane Growth Stages
       </h4>
       <div className="flex items-center mb-2">
-        <span className="w-5 h-5 bg-yellow-400 inline-block rounded-sm mr-3"></span>
+        <span className="rounded-full w-5 h-5 bg-red-400 inline-block rounded-sm mr-3"></span>
         <span>Germination (NDVI: 0.1 - 0.2)</span>
       </div>
       <div className="flex items-center mb-2">
-        <span className="w-5 h-5 bg-orange-400 inline-block rounded-sm mr-3"></span>
+        <span className="rounded-full w-5 h-5 bg-orange-400 inline-block rounded-sm mr-3"></span>
         <span>Tillering (NDVI: 0.2 - 0.4)</span>
       </div>
       <div className="flex items-center mb-2">
-        <span className="w-5 h-5 bg-green-500 inline-block rounded-sm mr-3"></span>
+        <span className="rounded-full w-5 h-5 bg-yellow-500 inline-block rounded-sm mr-3"></span>
         <span>Grand Growth (NDVI: 0.5 - 0.7)</span>
       </div>
       <div className="flex items-center">
-        <span className="w-5 h-5 bg-red-500 inline-block rounded-sm mr-3"></span>
+        <span className="rounded-full w-5 h-5 bg-green-500 inline-block rounded-sm mr-3"></span>
         <span>Ripening (NDVI: 0.3 - 0.5)</span>
       </div>
     </div>
@@ -92,13 +92,13 @@ const CheckHarvest = () => {
   const getTextColor = (growthStage) => {
     switch (growthStage) {
       case "Germination":
-        return "text-yellow-500";
+        return "text-red-500";
       case "Tillering":
         return "text-orange-500";
       case "Grand Growth":
-        return "text-green-500";
+        return "text-yellow-500";
       case "Ripening":
-        return "text-red-500";
+        return "text-green-500";
       default:
         return "text-gray-500";
     }
