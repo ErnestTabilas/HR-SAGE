@@ -308,6 +308,10 @@ const CheckHarvest = () => {
                         >
                           {location.stage}
                         </span>
+                        <br />
+                        {location.stage === "Ripening"
+                          ? "✔️ Ready for Harvest"
+                          : "⏳ Not Ready"}
                       </div>
                     </Popup>
                   </CircleMarker>
