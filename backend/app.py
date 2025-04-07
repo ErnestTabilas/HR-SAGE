@@ -1,9 +1,13 @@
 import os
+import logging
+import io
 import rasterio
 import numpy as np
 from flask import Flask, jsonify
 from flask_cors import CORS
-import logging
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
+from googleapiclient.http import MediaIoBaseDownload
 
 # Set up basic logging
 logging.basicConfig(level=logging.DEBUG)
@@ -14,34 +18,59 @@ CORS(app)
 # Get the current working directory (where app.py is located)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Construct the relative path to the GeoTIFF file in the data folder
-geotiff_path = os.path.join(current_dir, '..', 'data', 'NDVI_Victorias.tif')
+# Google Drive API setup
+SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
+SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+
+# Google Drive File ID of the GeoTIFF
+GEO_TIFF_FILE_ID = '1FXInxzim5gjfpmv4mVWY4X63FCqZ20_E'  # Replace with your actual file ID
+
+# Authenticate using the service account
+credentials = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE, scopes=SCOPES
+)
+drive_service = build("drive", "v3", credentials=credentials)
+
+def download_geotiff_from_drive():
+    """Downloads the GeoTIFF file from Google Drive and returns it as a BytesIO object."""
+    try:
+        request = drive_service.files().get_media(fileId=GEO_TIFF_FILE_ID)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        done = False
+        while done is False:
+            status, done = downloader.next_chunk()
+            logging.debug("Download %d%%.", int(status.progress() * 100))
+        fh.seek(0)  # Reset the pointer to the start of the file
+        logging.info("GeoTIFF file downloaded successfully from Google Drive.")
+        return fh
+    except Exception as e:
+        logging.error("Failed to download GeoTIFF: %s", str(e))
+        return None
 
 def classify_growth_stage(ndvi_value):
     """Classify the growth stage based on NDVI value."""
     if ndvi_value >= 0.5:
-        return "Grand Growth", "yellow"  # Grand Growth Stage (NDVI: 0.5 - 0.7)
+        return "Grand Growth", "yellow"
     elif ndvi_value >= 0.3:
-        return "Ripening", "green"  # Ripening Stage (NDVI: 0.3 - 0.5)
+        return "Ripening", "green"
     elif ndvi_value >= 0.2:
-        return "Tillering", "orange"  # Tillering Stage (NDVI: 0.2 - 0.4)
+        return "Tillering", "orange"
     elif ndvi_value >= 0.1:
-        return "Germination", "red"  # Germination Stage (NDVI: 0.1 - 0.2)
+        return "Germination", "red"
     else:
-        return "No Sugarcane", "gray"  # No sugarcane detected (NDVI below 0.1)
+        return "No Sugarcane", "gray"
 
 @app.route('/ndvi-data', methods=['GET'])
 def get_ndvi_data():
     try:
-        logging.debug("Opening GeoTIFF file at: %s", geotiff_path)
+        logging.debug("Fetching GeoTIFF file from Google Drive")
+        file_data = download_geotiff_from_drive()
+        if not file_data:
+            return jsonify({"error": "GeoTIFF download failed"}), 500
         
-        # Check if the file exists
-        if not os.path.exists(geotiff_path):
-            logging.error("GeoTIFF file not found at: %s", geotiff_path)
-            return jsonify({"error": "GeoTIFF file not found"}), 500
-        
-        # Open the local GeoTIFF file
-        with rasterio.open(geotiff_path) as src:
+        # Open the GeoTIFF file from the in-memory BytesIO object
+        with rasterio.open(file_data) as src:
             logging.debug("GeoTIFF file opened successfully.")
             
             # Get image bounds (min and max lat/lon)
@@ -63,10 +92,13 @@ def get_ndvi_data():
 @app.route("/sugarcane-locations", methods=["GET"])
 def get_sugarcane_locations():
     try:
-        logging.debug("Opening GeoTIFF file at: %s", geotiff_path)
+        logging.debug("Fetching GeoTIFF file from Google Drive")
+        file_data = download_geotiff_from_drive()
+        if not file_data:
+            return jsonify({"error": "GeoTIFF download failed"}), 500
         
-        # Open the local GeoTIFF file
-        with rasterio.open(geotiff_path) as src:
+        # Open the GeoTIFF file from the in-memory BytesIO object
+        with rasterio.open(file_data) as src:
             logging.debug("GeoTIFF file opened successfully.")
             
             # Read the raster data into a numpy array
