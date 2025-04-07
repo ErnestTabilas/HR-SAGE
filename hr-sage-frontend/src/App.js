@@ -14,6 +14,7 @@ import {
   faBell,
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
+import { motion } from "framer-motion"; // Import framer-motion
 import Home from "./pages/Home";
 import CheckHarvest from "./pages/CheckHarvest";
 import AboutUs from "./pages/AboutUs"; // Import AboutUs page
@@ -183,11 +184,20 @@ const MainContent = () => {
       </div>
 
       <div className="p-4">
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/check-harvest" element={<CheckHarvest />} />
-          <Route path="/about-us" element={<AboutUs />} /> {/* New route */}
-        </Routes>
+        {/* Use motion.div to apply page transition */}
+        <motion.div
+          key={location.key}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/check-harvest" element={<CheckHarvest />} />
+            <Route path="/about-us" element={<AboutUs />} />
+          </Routes>
+        </motion.div>
       </div>
 
       {notificationOpen && (
