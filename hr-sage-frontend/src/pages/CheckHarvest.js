@@ -55,11 +55,11 @@ const Legend = ({ onSearch }) => {
             placeholder="Enter a place name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="border-2 rounded-l-md w-full p-2 focus:outline-none focus:ring focus:border-green-500"
+            className="border-2 rounded-l-md w-full p-2 focus:outline-none focus:ring focus:border-emerald-500"
           />
           <button
             onClick={handleSearch}
-            className="bg-green-600 px-3 py-2 rounded-r-md hover:bg-green-700"
+            className="bg-emerald-600 px-3 py-2 rounded-r-md hover:bg-emerald-700"
           >
             <FontAwesomeIcon icon={faSearch} className="text-white py-1" />
           </button>

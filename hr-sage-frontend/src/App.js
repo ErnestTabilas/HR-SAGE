@@ -47,7 +47,8 @@ const MainContent = () => {
     setTimeout(() => setSearchDropdownOpen(false), 200);
   };
 
-  const isActive = (path) => (location.pathname === path ? "bg-green-500" : "");
+  const isActive = (path) =>
+    location.pathname === path ? "bg-emerald-700" : "";
 
   return (
     <div className="relative bg-gradient-to-b from-green-50 to-green-200">
@@ -99,7 +100,7 @@ const MainContent = () => {
           <button onClick={toggleNotification} className="relative px-4">
             <FontAwesomeIcon
               icon={faBell}
-              className="text-white text-2xl cursor-pointer"
+              className="text-white text-2xl cursor-pointer hover:bg-emerald-700 rounded-md p-2 transition duration-300"
             />
           </button>
           {searchDropdownOpen && (
@@ -110,7 +111,7 @@ const MainContent = () => {
                   className="text-gray-500 text-4xl mb-2"
                 />
                 <p className="text-gray-600 text-center">
-                  This feature is still under development.
+                  The menu search feature is still under development.
                 </p>
               </div>
             </div>
@@ -187,7 +188,7 @@ const MainContent = () => {
                 className="text-gray-500 text-4xl mb-2"
               />
               <p className="text-gray-600 text-center">
-                This feature is still under development.
+                The notification feature is still under development.
               </p>
             </div>
           </div>
