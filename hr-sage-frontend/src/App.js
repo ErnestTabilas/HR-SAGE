@@ -64,10 +64,10 @@ const MainContent = () => {
             alt="HR-SAGE Logo"
             className="w-16 h-14 my-4 mx-4 mr-20"
           />
-          <nav className="flex items-center space-x-10 py-4">
+          <nav className="flex items-center space-x-5 py-4">
             <Link
               to="/"
-              className={`px-6 py-2 text-lg font-semibold text-white rounded-lg transition font-thin ${isActive(
+              className={`px-6 py-2 text-lg font-semibold text-white rounded-lg transition font-thin hover:bg-emerald-700 ${isActive(
                 "/"
               )}`}
             >
@@ -75,7 +75,7 @@ const MainContent = () => {
             </Link>
             <Link
               to="/check-harvest"
-              className={`px-6 py-2 text-lg font-semibold text-white rounded-lg transition font-thin ${isActive(
+              className={`px-6 py-2 text-lg font-semibold text-white rounded-lg transition font-thin hover:bg-emerald-700 ${isActive(
                 "/check-harvest"
               )}`}
             >
