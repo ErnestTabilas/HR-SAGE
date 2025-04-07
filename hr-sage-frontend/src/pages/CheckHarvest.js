@@ -119,6 +119,15 @@ const CheckHarvest = () => {
   const [loading, setLoading] = useState(true);
   const mapRef = useRef(null);
 
+  // Define the bounds for the Philippines
+  const philippinesBounds = [
+    [4.5, 116.5], // Southeast (Min Lat, Min Lon)
+    [21.5, 126.5], // Northwest (Max Lat, Max Lon)
+  ];
+
+  // Define minZoom level based on the bounds of the Philippines
+  const minZoom = 6; // Suitable for viewing the whole Philippines
+
   useEffect(() => {
     setLoading(true);
 
@@ -191,8 +200,12 @@ const CheckHarvest = () => {
         ) : (
           <MapContainer
             style={{ height: "100vh", width: "100%" }}
-            bounds={bounds}
+            bounds={bounds || philippinesBounds} // Fallback to Philippines bounds
             ref={mapRef}
+            maxBounds={philippinesBounds} // Limit panning to the Philippines
+            maxZoom={12} // Restrict zooming level
+            minZoom={minZoom} // Restrict zoom out level to view only the Philippines
+            maxBoundsViscosity={1.0} // Completely prevent zooming out past the max bounds
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             {bounds && <MapBoundsAdjuster bounds={bounds} />}
@@ -220,10 +233,6 @@ const CheckHarvest = () => {
                       >
                         {location.stage}
                       </span>
-                      <br />
-                      {location.stage === "Ripening"
-                        ? "✔️ Ready for Harvest"
-                        : "⏳ Not Ready"}
                     </div>
                   </Popup>
                 </CircleMarker>
