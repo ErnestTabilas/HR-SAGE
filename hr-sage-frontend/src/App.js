@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -28,41 +28,29 @@ const App = () => {
 };
 
 const MainContent = () => {
-  const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [searchDropdownOpen, setSearchDropdownOpen] = useState(false);
-  const prevPathRef = useRef(null); // Initialize with null for the very first navigation
-  const [direction, setDirection] = useState("");
+  const location = useLocation();
 
-  const toggleMenu = () => setMenuOpen(!menuOpen);
-  const toggleNotification = () => setNotificationOpen(!notificationOpen);
+  const toggleMenu = () => {
+    setMenuOpen(!menuOpen);
+  };
 
-  const handleSearchFocus = () => setSearchDropdownOpen(true);
-  const handleSearchBlur = () =>
+  const toggleNotification = () => {
+    setNotificationOpen(!notificationOpen);
+  };
+
+  const handleSearchFocus = () => {
+    setSearchDropdownOpen(true);
+  };
+
+  const handleSearchBlur = () => {
     setTimeout(() => setSearchDropdownOpen(false), 200);
+  };
 
   const isActive = (path) =>
     location.pathname === path ? "bg-emerald-700" : "";
-
-  useEffect(() => {
-    const prevPath = prevPathRef.current;
-
-    // Skip the logic if prevPath is null (indicating first navigation)
-    if (prevPath === null) {
-      prevPathRef.current = location.pathname;
-      return; // Exit useEffect to prevent setting direction on the first navigation
-    }
-
-    // Determine transition direction based on previous and current path
-    if (location.pathname === "/") {
-      setDirection("right");
-    } else if (location.pathname === "/about-us") {
-      setDirection("left");
-    }
-    // Update prevPath to the current path after comparison
-    prevPathRef.current = location.pathname;
-  }, [location]);
 
   return (
     <div className="relative bg-gradient-to-b from-green-50 to-green-200">
@@ -196,13 +184,13 @@ const MainContent = () => {
       </div>
 
       <div className="p-4">
-        {/* Use motion.div to apply dynamic sliding transition */}
+        {/* Use motion.div to apply page transition */}
         <motion.div
           key={location.key}
-          initial={{ x: direction === "left" ? "-100%" : "100%" }} // Start from the appropriate side
-          animate={{ x: 0 }} // Slide into the view
-          exit={{ x: direction === "left" ? "100%" : "-100%" }} // Exit in the opposite direction
-          transition={{ type: "spring", stiffness: 100, damping: 25 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.5 }}
         >
           <Routes>
             <Route path="/" element={<Home />} />
