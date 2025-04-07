@@ -8,13 +8,7 @@ import {
   Popup,
 } from "react-leaflet";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faSearch,
-  faBars,
-  faTimes,
-  faBell,
-  faExclamationTriangle,
-} from "@fortawesome/free-solid-svg-icons";
+import { faSearch } from "@fortawesome/free-solid-svg-icons";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
@@ -33,13 +27,17 @@ const getTextColor = (growthStage) => {
   }
 };
 
-const Legend = ({ onSearch }) => {
+const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const handleSearch = () => {
     if (searchTerm.trim() !== "") {
       onSearch(searchTerm);
     }
+  };
+
+  const handleCircleClick = (stage) => {
+    onToggleStage(stage);
   };
 
   return (
@@ -66,28 +64,83 @@ const Legend = ({ onSearch }) => {
         </div>
       </div>
 
-      {/* Legend */}
+      {/* Legend with colored circles acting as toggles */}
       <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           Sugarcane Growth Stages
         </h4>
-        <div className="flex items-center mb-2">
-          <span className="rounded-full w-5 h-5 bg-red-400 inline-block mr-3"></span>
-          <span>Germination (NDVI: 0.1 - 0.2)</span>
-        </div>
-        <div className="flex items-center mb-2">
-          <span className="rounded-full w-5 h-5 bg-orange-400 inline-block mr-3"></span>
-          <span>Tillering (NDVI: 0.2 - 0.4)</span>
-        </div>
-        <div className="flex items-center mb-2">
-          <span className="rounded-full w-5 h-5 bg-yellow-500 inline-block mr-3"></span>
-          <span>Grand Growth (NDVI: 0.5 - 0.7)</span>
-        </div>
-        <div className="flex items-center">
-          <span className="rounded-full w-5 h-5 bg-green-500 inline-block mr-3"></span>
-          <span>Ripening (NDVI: 0.3 - 0.5)</span>
-        </div>
+        <table className="w-full">
+          <thead>
+            <tr>
+              <th className="text-left text-gray-700 font-semibold pb-2">
+                Stage
+              </th>
+              <th className="text-right text-gray-700 font-semibold pb-2">
+                NDVI Value
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              className="cursor-pointer"
+              onClick={() => handleCircleClick("Germination")}
+            >
+              <td className="flex items-center space-x-2">
+                <span
+                  className={`rounded-full w-5 h-5 ${
+                    selectedStages.Germination ? "bg-red-500" : "bg-gray-300"
+                  }`}
+                ></span>
+                <span>Germination</span>
+              </td>
+              <td className="text-right text-xs">(0.1 - 0.2)</td>
+            </tr>
+            <tr
+              className="cursor-pointer"
+              onClick={() => handleCircleClick("Tillering")}
+            >
+              <td className="flex items-center space-x-2">
+                <span
+                  className={`rounded-full w-5 h-5 ${
+                    selectedStages.Tillering ? "bg-orange-500" : "bg-gray-300"
+                  }`}
+                ></span>
+                <span>Tillering</span>
+              </td>
+              <td className="text-right text-xs">(0.2 - 0.4)</td>
+            </tr>
+            <tr
+              className="cursor-pointer"
+              onClick={() => handleCircleClick("GrandGrowth")}
+            >
+              <td className="flex items-center space-x-2">
+                <span
+                  className={`rounded-full w-5 h-5 ${
+                    selectedStages.GrandGrowth ? "bg-yellow-500" : "bg-gray-300"
+                  }`}
+                ></span>
+                <span>Grand Growth</span>
+              </td>
+              <td className="text-right text-xs">(0.5 - 0.7)</td>
+            </tr>
+            <tr
+              className="cursor-pointer"
+              onClick={() => handleCircleClick("Ripening")}
+            >
+              <td className="flex items-center space-x-2">
+                <span
+                  className={`rounded-full w-5 h-5 ${
+                    selectedStages.Ripening ? "bg-green-500" : "bg-gray-300"
+                  }`}
+                ></span>
+                <span>Ripening</span>
+              </td>
+              <td className="text-right text-xs">(0.3 - 0.5)</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
+
       <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           About this Map
@@ -117,6 +170,12 @@ const CheckHarvest = () => {
   const [bounds, setBounds] = useState(null);
   const [sugarcaneLocations, setSugarcaneLocations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedStages, setSelectedStages] = useState({
+    Germination: true,
+    Tillering: true,
+    GrandGrowth: true,
+    Ripening: true,
+  });
   const mapRef = useRef(null);
 
   // Define the bounds for the Philippines
@@ -182,11 +241,22 @@ const CheckHarvest = () => {
     }
   };
 
+  const handleToggleStage = (stage) => {
+    setSelectedStages((prevState) => ({
+      ...prevState,
+      [stage]: !prevState[stage],
+    }));
+  };
+
   return (
     <div className="flex h-screen">
       {/* Sidebar */}
       <div className="bg-gradient-to-b from-green-50 to-green-200 w-1/4 bg-gray-50 p-6 border-r border-gray-300 overflow-y-auto">
-        <Legend onSearch={searchLocation} />
+        <Legend
+          onSearch={searchLocation}
+          selectedStages={selectedStages}
+          onToggleStage={handleToggleStage}
+        />
       </div>
 
       {/* Map Section */}
@@ -213,30 +283,34 @@ const CheckHarvest = () => {
               <ImageOverlay url={ndviUrl} bounds={bounds} opacity={0.7} />
             )}
             {!loading &&
-              sugarcaneLocations.map((location, index) => (
-                <CircleMarker
-                  key={index}
-                  center={[location.lat, location.lng]}
-                  radius={5}
-                  pathOptions={{
-                    color: location.color,
-                    fillColor: location.color,
-                    fillOpacity: 0.5,
-                  }}
-                >
-                  <Popup>
-                    <div className="rounded-md text-center">
-                      <span
-                        className={`font-bold text-lg ${getTextColor(
-                          location.stage
-                        )}`}
-                      >
-                        {location.stage}
-                      </span>
-                    </div>
-                  </Popup>
-                </CircleMarker>
-              ))}
+              sugarcaneLocations
+                .filter(
+                  (location) => selectedStages[location.stage] // Only show if the stage is selected
+                )
+                .map((location, index) => (
+                  <CircleMarker
+                    key={index}
+                    center={[location.lat, location.lng]}
+                    radius={5}
+                    pathOptions={{
+                      color: location.color,
+                      fillColor: location.color,
+                      fillOpacity: 0.5,
+                    }}
+                  >
+                    <Popup>
+                      <div className="rounded-md text-center">
+                        <span
+                          className={`font-bold text-lg ${getTextColor(
+                            location.stage
+                          )}`}
+                        >
+                          {location.stage}
+                        </span>
+                      </div>
+                    </Popup>
+                  </CircleMarker>
+                ))}
           </MapContainer>
         )}
       </div>
