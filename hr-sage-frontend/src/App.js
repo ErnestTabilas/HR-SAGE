@@ -16,6 +16,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import Home from "./pages/Home";
 import CheckHarvest from "./pages/CheckHarvest";
+import AboutUs from "./pages/AboutUs"; // Import AboutUs page
 
 const App = () => {
   return (
@@ -80,6 +81,14 @@ const MainContent = () => {
               )}`}
             >
               Check Harvest
+            </Link>
+            <Link
+              to="/about-us"
+              className={`px-6 py-2 text-lg font-semibold text-white rounded-lg transition font-thin hover:bg-emerald-700 ${isActive(
+                "/about-us"
+              )}`}
+            >
+              About Us
             </Link>
           </nav>
         </div>
@@ -161,6 +170,15 @@ const MainContent = () => {
           >
             Check Harvest
           </Link>
+          <Link
+            to="/about-us"
+            className={`text-lg font-semibold text-white rounded-lg transition font-thin px-4 py-2 ${isActive(
+              "/about-us"
+            )}`}
+            onClick={toggleMenu}
+          >
+            About Us
+          </Link>
         </nav>
       </div>
 
@@ -168,6 +186,7 @@ const MainContent = () => {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/check-harvest" element={<CheckHarvest />} />
+          <Route path="/about-us" element={<AboutUs />} /> {/* New route */}
         </Routes>
       </div>
 

@@ -148,8 +148,10 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
         <p className="text-sm text-gray-600 leading-relaxed">
           This map visualizes the sugarcane farm growth stages based on NDVI.
           The colors represent different stages of growth. You can click on the
-          ellipses to select which crop stage are visible on the map. You can
-          also search for places in the Philippines using the search function.
+          ellipses on the Legend panel to select which crop stage are visible on
+          the map. Clicking an ellipse on the map will show you the selected
+          crop's growth stage and harvest readiness. You can also search for
+          places in the Philippines using the search function.
         </p>
       </div>
     </div>
