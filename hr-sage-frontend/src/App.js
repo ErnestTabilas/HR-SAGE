@@ -53,7 +53,6 @@ const MainContent = () => {
       prevPathRef.current = location.pathname;
       return; // Exit useEffect to prevent setting direction on the first navigation
     }
-    console.log(prevPath, location.pathname, direction);
 
     // Determine transition direction based on previous and current path
     if (location.pathname === "/") {
