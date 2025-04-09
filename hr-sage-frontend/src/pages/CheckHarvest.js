@@ -192,7 +192,7 @@ const CheckHarvest = () => {
   const minZoom = 1; // Suitable for viewing the whole Philippines
 
   // Distance threshold for when to render a circle marker (in meters)
-  const distanceThreshold = 500; // Change this value based on performance requirements
+  const distanceThreshold = 5000; // Change this value based on performance requirements
 
   useEffect(() => {
     setLoading(true);

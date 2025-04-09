@@ -27,8 +27,8 @@ SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 
 GEO_TIFF_FILE_IDS = [
     '16fa6nHneb0LZVwa7vo32mBocrjruzYKU',  # Isabela
-    # '1vIJgJ0mEHTLukPEQmCgAlFueVOjEv3JP', 
-    # '1sJrwR87DjUbYQhpLeS0lPLMoofXSaXs7'
+    '1vIJgJ0mEHTLukPEQmCgAlFueVOjEv3JP', 
+    '1sJrwR87DjUbYQhpLeS0lPLMoofXSaXs7'
 ]
 
 # Authenticate using the service account
