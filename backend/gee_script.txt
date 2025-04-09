@@ -1,0 +1,68 @@
+// Define bounding boxes for specific sugarcane regions in Luzon, Visayas, and Mindanao
+
+var luzon = ee.FeatureCollection([
+  ee.Feature(ee.Geometry.Rectangle([121.25, 15.5, 122.5, 16.5])), // Isabela
+  ee.Feature(ee.Geometry.Rectangle([120.5, 14.5, 121.5, 15.5])), // Tarlac
+  ee.Feature(ee.Geometry.Rectangle([120.5, 13.0, 121.0, 14.0])), // Pangasinan
+  ee.Feature(ee.Geometry.Rectangle([121.0, 13.5, 122.0, 14.5])), // Batangas
+  ee.Feature(ee.Geometry.Rectangle([121.75, 15.5, 122.25, 16.5]))  // Negros Occidental
+]);
+
+var visayas = ee.FeatureCollection([
+  ee.Feature(ee.Geometry.Rectangle([122.5, 9.5, 123.5, 10.5])), // Iloilo
+  ee.Feature(ee.Geometry.Rectangle([124.0, 9.0, 125.0, 10.0])), // Leyte
+  ee.Feature(ee.Geometry.Rectangle([122.5, 10.0, 123.5, 11.0])), // Bohol
+  ee.Feature(ee.Geometry.Rectangle([122.25, 10.5, 123.0, 11.5])), // Antique
+  ee.Feature(ee.Geometry.Rectangle([122.75, 10.5, 123.5, 11.5]))  // Negros Occidental
+]);
+
+var mindanao = ee.FeatureCollection([
+  ee.Feature(ee.Geometry.Rectangle([125.0, 6.5, 126.0, 7.5])), // Davao del Sur
+  ee.Feature(ee.Geometry.Rectangle([124.5, 7.5, 125.5, 8.5])), // Bukidnon
+  ee.Feature(ee.Geometry.Rectangle([124.0, 6.5, 125.0, 7.5])), // North Cotabato
+  ee.Feature(ee.Geometry.Rectangle([122.75, 7.0, 123.75, 8.0])), // Zamboanga del Sur
+  ee.Feature(ee.Geometry.Rectangle([124.0, 6.0, 125.0, 7.0]))  // Sultan Kudarat
+]);
+
+// Combine all regions into one feature collection
+var allRegions = luzon.merge(visayas).merge(mindanao);
+
+// Load Sentinel-2 imagery and filter for the regions
+var image = ee.ImageCollection('COPERNICUS/S2_SR')
+  .filterBounds(allRegions)
+  .filterDate('2024-01-01', '2024-12-31')
+  .select(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B11', 'B12'])
+  .map(function(image) {
+    return image.clip(allRegions);
+  })
+  .median();
+
+// Compute NDVI
+var ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI');
+
+// Load land cover data to mask out non-cropland areas
+var landcover = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
+  .filterDate('2024-01-01', '2024-12-31')
+  .select('label')
+  .map(function(image) {
+    return image.clip(allRegions);
+  })
+  .median();
+
+var croplandMask = landcover.eq(3);  // Cropland is label 3 in Dynamic World
+var ndviMasked = ndvi.updateMask(croplandMask);
+
+// Loop through each region in the collection and export the NDVI data
+allRegions.evaluate(function(regions) {
+  for (var i = 0; i < regions.features.length; i++) {
+    var region = ee.Feature(regions.features[i]);
+    Export.image.toDrive({
+      image: ndviMasked.clip(region.geometry()),
+      description: 'NDVI_Region_' + i,
+      scale: 30,
+      region: region.geometry(),
+      maxPixels: 1e13
+    });
+    print('Export task initiated for Region ' + i);
+  }
+});

@@ -11,6 +11,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
+import L from "leaflet"; // Importing Leaflet
 
 const getTextColor = (growthStage) => {
   switch (growthStage) {
@@ -188,22 +189,10 @@ const CheckHarvest = () => {
   ];
 
   // Define minZoom level based on the bounds of the Philippines
-  const minZoom = 6; // Suitable for viewing the whole Philippines
+  const minZoom = 1; // Suitable for viewing the whole Philippines
 
   useEffect(() => {
     setLoading(true);
-
-    axios
-      .get("http://127.0.0.1:5000/ndvi-data")
-      .then((response) => {
-        const { min_lon, min_lat, max_lon, max_lat } = response.data;
-        const mapBounds = [
-          [min_lat, min_lon],
-          [max_lat, max_lon],
-        ];
-        setBounds(mapBounds);
-      })
-      .catch((error) => console.error("Error fetching NDVI metadata:", error));
 
     axios
       .get("http://127.0.0.1:5000/sugarcane-locations")

@@ -1,0 +1,24 @@
+    # ------------ PHILIPPINES ------------
+    # '1XzGSFATj3wuuF53dNLfgNccQQsebvqBX',
+    # '1u_z8XbHsrst_VU4KAOrTFaI5AprIrhtP',  
+    # '1KtpQvxRljBEOWPQk4VwBQchZw7g6ryjG',
+    # '1_IdhPBaDU2od0NipB93DIT-5Jmb_Vf-A'
+    # ------------- LA VICTORIAS/NEGROS ------------
+    # '1-hgPFNW8PwnhHVKw3HHrtVeIgw5IvSp4',
+    # '1FXInxzim5gjfpmv4mVWY4X63FCqZ20_E'
+    # ------------- SUGARCANE FARM REGIONS IN PH -------------
+    '16fa6nHneb0LZVwa7vo32mBocrjruzYKU', # Isabela
+    # '1vp-d0tWwRTWDo4v5nLZ3LZ-u6slrZ7ko', # Tarlac
+    # '1m2HnN8coNj8VOnDW13tFem6H_cwlX_HH', # Pangasinan
+    # '1P41YhvNNcnqxdTqsQ-pI6-R66N7xSINi', # Batangas
+    # '1dupB3t6IeLJ-WHDYGbOc9riGXvrcZ131', # Negros Occidental
+    # '1lVE2ngDG5rEMORPg2FpDrr6LF-8I1g_s', # Ilo-ilo
+    # '1NaUr5Dheprfn_XaacwIy0gGzfxoHsyfV', # Leyte
+    # '1sJrwR87DjUbYQhpLeS0lPLMoofXSaXs7', # Bohol
+    # '1sIrpp5PTm-Kfn3iVYBSfQY18t9AYfHca', # Antique
+    # '11kFuQzmPugktBbLf3pxwdy4HWPICM8PK', # Negros Occidental
+    # '154ux99_X84r6ign5LjIVeYrvOnYiqyY6', # Davao Del Sur
+    # '1wGbEcz14rP9lbvkv5-imPynlrS8cxajV', # Bukidnon
+    # '1By45BvTUivnTOSNptsoyNKYXwwLRmz_1', # North Cotabato 
+    # '1vIJgJ0mEHTLukPEQmCgAlFueVOjEv3JP', # Zamboanga Del Sur
+    # '1uWbLzn668srVuFAHuhD7DUnajvJ0edca', # Sultan Kudarat
