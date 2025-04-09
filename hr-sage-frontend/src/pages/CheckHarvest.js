@@ -7,11 +7,11 @@ import {
   CircleMarker,
   Popup,
 } from "react-leaflet";
+import L from "leaflet"; // Importing Leaflet
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch } from "@fortawesome/free-solid-svg-icons";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
-import L from "leaflet"; // Importing Leaflet
 
 const getTextColor = (growthStage) => {
   switch (growthStage) {
@@ -82,6 +82,7 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
             </tr>
           </thead>
           <tbody>
+            {/* Growth Stage Rows */}
             <tr
               className="cursor-pointer"
               onClick={() => handleCircleClick("Germination")}
@@ -141,7 +142,6 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
           </tbody>
         </table>
       </div>
-
       <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           About this Map
@@ -190,6 +190,9 @@ const CheckHarvest = () => {
 
   // Define minZoom level based on the bounds of the Philippines
   const minZoom = 1; // Suitable for viewing the whole Philippines
+
+  // Distance threshold for when to render a circle marker (in meters)
+  const distanceThreshold = 500; // Change this value based on performance requirements
 
   useEffect(() => {
     setLoading(true);
@@ -240,6 +243,15 @@ const CheckHarvest = () => {
     }));
   };
 
+  const isMarkerTooClose = (newLocation, existingLocations) => {
+    return existingLocations.some((location) => {
+      const dist = L.latLng(newLocation.lat, newLocation.lng).distanceTo(
+        L.latLng(location.lat, location.lng)
+      );
+      return dist < distanceThreshold; // If too close, return true
+    });
+  };
+
   return (
     <div className="flex h-screen">
       {/* Sidebar */}
@@ -279,6 +291,12 @@ const CheckHarvest = () => {
                 .filter(
                   (location) => selectedStages[location.stage] // Only show if the stage is selected
                 )
+                .reduce((validLocations, location) => {
+                  if (!isMarkerTooClose(location, validLocations)) {
+                    validLocations.push(location);
+                  }
+                  return validLocations;
+                }, [])
                 .map((location, index) => (
                   <CircleMarker
                     key={index}
