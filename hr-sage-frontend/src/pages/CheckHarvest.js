@@ -159,16 +159,6 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   );
 };
 
-const MapBoundsAdjuster = ({ bounds }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (bounds) {
-      map.fitBounds(bounds, { padding: [10, 10] });
-    }
-  }, [bounds, map]);
-  return null;
-};
-
 const CheckHarvest = () => {
   const [ndviUrl, setNdviUrl] = useState(null);
   const [bounds, setBounds] = useState(null);
@@ -180,6 +170,7 @@ const CheckHarvest = () => {
     GrandGrowth: true,
     Ripening: true,
   });
+  const [minValidSugarcaneCount, setMinValidSugarcaneCount] = useState(20); // Minimum valid sugarcane count in a group
   const mapRef = useRef(null);
 
   // Define the bounds for the Philippines
@@ -191,8 +182,8 @@ const CheckHarvest = () => {
   // Define minZoom level based on the bounds of the Philippines
   const minZoom = 1; // Suitable for viewing the whole Philippines
 
-  // Distance threshold for when to render a circle marker (in meters)
-  const distanceThreshold = 5000; // Change this value based on performance requirements
+  // Distance threshold for grouping markers (in meters)
+  const groupingThreshold = 50; // Group sugarcane within 100 meters
 
   useEffect(() => {
     setLoading(true);
@@ -243,13 +234,47 @@ const CheckHarvest = () => {
     }));
   };
 
-  const isMarkerTooClose = (newLocation, existingLocations) => {
-    return existingLocations.some((location) => {
-      const dist = L.latLng(newLocation.lat, newLocation.lng).distanceTo(
-        L.latLng(location.lat, location.lng)
-      );
-      return dist < distanceThreshold; // If too close, return true
-    });
+  // Group locations based on proximity
+  const groupLocations = (locations) => {
+    let groups = [];
+    let visited = new Set();
+
+    for (let i = 0; i < locations.length; i++) {
+      if (visited.has(i)) continue;
+
+      let group = [locations[i]];
+      visited.add(i);
+
+      for (let j = i + 1; j < locations.length; j++) {
+        if (visited.has(j)) continue;
+
+        const dist = L.latLng(locations[i].lat, locations[i].lng).distanceTo(
+          L.latLng(locations[j].lat, locations[j].lng)
+        );
+
+        if (dist < groupingThreshold) {
+          group.push(locations[j]);
+          visited.add(j);
+        }
+      }
+
+      if (group.length >= minValidSugarcaneCount) {
+        groups.push(group);
+      }
+    }
+
+    return groups;
+  };
+
+  const isValidGroup = (group) => group.length >= minValidSugarcaneCount;
+  const MapBoundsAdjuster = () => {
+    const map = useMap();
+    useEffect(() => {
+      if (map) {
+        map.fitBounds(philippinesBounds, { padding: [10, 10] });
+      }
+    }, [map]);
+    return null;
   };
 
   return (
@@ -278,8 +303,10 @@ const CheckHarvest = () => {
             ref={mapRef}
             maxBounds={philippinesBounds} // Limit panning to the Philippines
             maxZoom={12} // Restrict zooming level
-            minZoom={minZoom} // Restrict zoom out level to view only the Philippines
+            minZoom={6} // Restrict zoom out level to view only the Philippines
             maxBoundsViscosity={1.0} // Completely prevent zooming out past the max bounds
+            zoom={7} // Initial zoom level
+            scrollWheelZoom={true} // Enable scroll zooming if needed
           >
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             {bounds && <MapBoundsAdjuster bounds={bounds} />}
@@ -287,19 +314,14 @@ const CheckHarvest = () => {
               <ImageOverlay url={ndviUrl} bounds={bounds} opacity={0.7} />
             )}
             {!loading &&
-              sugarcaneLocations
-                .filter(
-                  (location) => selectedStages[location.stage] // Only show if the stage is selected
+              groupLocations(
+                sugarcaneLocations.filter(
+                  (location) => selectedStages[location.stage]
                 )
-                .reduce((validLocations, location) => {
-                  if (!isMarkerTooClose(location, validLocations)) {
-                    validLocations.push(location);
-                  }
-                  return validLocations;
-                }, [])
-                .map((location, index) => (
+              ).map((group, index) =>
+                group.slice(0, 10).map((location, locIndex) => (
                   <CircleMarker
-                    key={index}
+                    key={`${index}-${locIndex}`}
                     center={[location.lat, location.lng]}
                     radius={5}
                     pathOptions={{
@@ -324,7 +346,8 @@ const CheckHarvest = () => {
                       </div>
                     </Popup>
                   </CircleMarker>
-                ))}
+                ))
+              )}
           </MapContainer>
         )}
       </div>

@@ -16,19 +16,23 @@ logging.basicConfig(level=logging.DEBUG)
 app = Flask(__name__)
 CORS(app)
 
-
 # Get the current working directory (where app.py is located)
 current_dir = os.path.dirname(os.path.abspath(__file__))
-
 
 # Google Drive API setup
 SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 
 GEO_TIFF_FILE_IDS = [
-    '16fa6nHneb0LZVwa7vo32mBocrjruzYKU',  # Isabela
-    '1vIJgJ0mEHTLukPEQmCgAlFueVOjEv3JP', 
-    '1sJrwR87DjUbYQhpLeS0lPLMoofXSaXs7'
+    '1ZDiGhVDMdBSXpCotp4SE7JdHL-t7AU2',
+	# '1PIF9403xplypmkUeA2ggn2APBZJQ9RRj',
+	# '13jV1svFsjbx1RyBLkQ9N2Wpy5i2xNgEH',
+	# '1tDmHBWlljP4nlxbzdNFn4H7MdyoFutGw',
+	'19j2vmYYMF5DA0ek2zL54Z2FAczQ4T3XP',
+	# '1y-blbykzzViV1oX9PLdOR_OF6qomsG4b',
+	# '1iA2Z6rS61AqMZJdeIBXF6KmKHAeD4rGZ',
+	# '1l1KuSJEGb8d9huIZGFbHFWwgqqvrmVaB',
+	# '1BJrbi_wtt64PYoYaDy4SPIJQWxLfNDpb'
 ]
 
 # Authenticate using the service account
@@ -95,7 +99,8 @@ def get_ndvi_data():
         mosaic, transform = merge(datasets)
         
         # Get image bounds (min and max lat/lon) from the merged raster
-        min_lon, min_lat, max_lon, max_lat = rasterio.transform.xy(transform, 0, 0)
+        min_lon, min_lat = rasterio.transform.xy(transform, 0, 0)
+        max_lon, max_lat = rasterio.transform.xy(transform, mosaic.shape[1]-1, mosaic.shape[0]-1)
 
         return jsonify({
             "min_lon": min_lon,

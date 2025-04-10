@@ -22,3 +22,17 @@
     # '1By45BvTUivnTOSNptsoyNKYXwwLRmz_1', # North Cotabato 
     # '1vIJgJ0mEHTLukPEQmCgAlFueVOjEv3JP', # Zamboanga Del Sur
     # '1uWbLzn668srVuFAHuhD7DUnajvJ0edca', # Sultan Kudarat
+    # ------------- CONVEX DATA -------------
+    '1VpeK89Yy2MJzw0wHKzprXGWcByu8vRcT',
+    '1WlFnrfLeCIDQYTZ_VuYEabdX8wkg56YL',
+    '1H1Q0kSkwBzR3fG3U3uZPCIMBarmmCn4M'
+    # ------------- ELIMINATED ROADS AND WATERS ----------
+    	'1ZDiGhVDMdBSXpCotp4SE7JdHL-t7AU2',
+	'1PIF9403xplypmkUeA2ggn2APBZJQ9RRj',
+	'13jV1svFsjbx1RyBLkQ9N2Wpy5i2xNgEH',
+	'1tDmHBWlljP4nlxbzdNFn4H7MdyoFutGw',
+	'19j2vmYYMF5DA0ek2zL54Z2FAczQ4T3XP',
+	'1y-blbykzzViV1oX9PLdOR_OF6qomsG4b',
+	'1iA2Z6rS61AqMZJdeIBXF6KmKHAeD4rGZ',
+	'1l1KuSJEGb8d9huIZGFbHFWwgqqvrmVaB',
+	'1BJrbi_wtt64PYoYaDy4SPIJQWxLfNDpb'
