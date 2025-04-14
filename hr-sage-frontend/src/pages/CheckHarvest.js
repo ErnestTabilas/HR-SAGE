@@ -9,7 +9,7 @@ import {
 } from "react-leaflet";
 import L from "leaflet"; // Importing Leaflet
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faSearch } from "@fortawesome/free-solid-svg-icons";
+import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
@@ -183,7 +183,7 @@ const CheckHarvest = () => {
   const minZoom = 1; // Suitable for viewing the whole Philippines
 
   // Distance threshold for grouping markers (in meters)
-  const groupingThreshold = 50; // Group sugarcane within 100 meters
+  const groupingThreshold = 5000; // Group sugarcane within 100 meters
 
   useEffect(() => {
     setLoading(true);
@@ -291,7 +291,12 @@ const CheckHarvest = () => {
       {/* Map Section */}
       <div className="w-3/4 relative z-0">
         {loading ? (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-70 z-10">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-70 z-10">
+            <FontAwesomeIcon
+              icon={faSpinner}
+              spin
+              className="text-emerald-600 text-4xl mb-3"
+            />
             <p className="text-lg font-semibold text-gray-700">
               Loading NDVI data...
             </p>
@@ -302,7 +307,7 @@ const CheckHarvest = () => {
             bounds={bounds || philippinesBounds} // Fallback to Philippines bounds
             ref={mapRef}
             maxBounds={philippinesBounds} // Limit panning to the Philippines
-            maxZoom={12} // Restrict zooming level
+            maxZoom={24} // Restrict zooming level
             minZoom={6} // Restrict zoom out level to view only the Philippines
             maxBoundsViscosity={1.0} // Completely prevent zooming out past the max bounds
             zoom={7} // Initial zoom level

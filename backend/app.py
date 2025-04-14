@@ -28,7 +28,7 @@ GEO_TIFF_FILE_IDS = [
 	# '1PIF9403xplypmkUeA2ggn2APBZJQ9RRj',
 	# '13jV1svFsjbx1RyBLkQ9N2Wpy5i2xNgEH',
 	# '1tDmHBWlljP4nlxbzdNFn4H7MdyoFutGw',
-	'19j2vmYYMF5DA0ek2zL54Z2FAczQ4T3XP',
+	# '19j2vmYYMF5DA0ek2zL54Z2FAczQ4T3XP',
 	# '1y-blbykzzViV1oX9PLdOR_OF6qomsG4b',
 	# '1iA2Z6rS61AqMZJdeIBXF6KmKHAeD4rGZ',
 	# '1l1KuSJEGb8d9huIZGFbHFWwgqqvrmVaB',
@@ -140,7 +140,7 @@ def get_sugarcane_locations():
         mosaic, transform = merge(datasets)
 
         # Read the merged raster data into a numpy array
-        raster_data = mosaic[0]  # Assuming it's a single-band raster
+        raster_data = mosaic[0]  # Assuming it's a sixngle-band raster
         sugarcane_mask = (raster_data > 0.1) & (raster_data <= 1.0)  # Mask for sugarcane
 
         sugarcane_locations = []
