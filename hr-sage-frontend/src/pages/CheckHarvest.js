@@ -4,10 +4,11 @@ import {
   TileLayer,
   ImageOverlay,
   useMap,
+  useMapEvents,
   CircleMarker,
   Popup,
 } from "react-leaflet";
-import L from "leaflet"; // Importing Leaflet
+import L from "leaflet";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
 import "leaflet/dist/leaflet.css";
@@ -43,7 +44,6 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
 
   return (
     <div className="space-y-4 px-4">
-      {/* Search Input */}
       <div className="bg-white p-5 shadow-md rounded-lg">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           Search for a Place
@@ -65,7 +65,6 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
         </div>
       </div>
 
-      {/* Legend with colored circles acting as toggles */}
       <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           Sugarcane Growth Stages
@@ -82,66 +81,45 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
             </tr>
           </thead>
           <tbody>
-            {/* Growth Stage Rows */}
-            <tr
-              className="cursor-pointer"
-              onClick={() => handleCircleClick("Germination")}
-            >
-              <td className="flex items-center space-x-2">
-                <span
-                  className={`rounded-full w-5 h-5 ${
-                    selectedStages.Germination ? "bg-red-500" : "bg-gray-300"
-                  }`}
-                ></span>
-                <span>Germination</span>
-              </td>
-              <td className="text-right text-xs">(0.1 - 0.2)</td>
-            </tr>
-            <tr
-              className="cursor-pointer"
-              onClick={() => handleCircleClick("Tillering")}
-            >
-              <td className="flex items-center space-x-2">
-                <span
-                  className={`rounded-full w-5 h-5 ${
-                    selectedStages.Tillering ? "bg-orange-500" : "bg-gray-300"
-                  }`}
-                ></span>
-                <span>Tillering</span>
-              </td>
-              <td className="text-right text-xs">(0.2 - 0.4)</td>
-            </tr>
-            <tr
-              className="cursor-pointer"
-              onClick={() => handleCircleClick("GrandGrowth")}
-            >
-              <td className="flex items-center space-x-2">
-                <span
-                  className={`rounded-full w-5 h-5 ${
-                    selectedStages.GrandGrowth ? "bg-yellow-500" : "bg-gray-300"
-                  }`}
-                ></span>
-                <span>Grand Growth</span>
-              </td>
-              <td className="text-right text-xs">(0.5 - 0.7)</td>
-            </tr>
-            <tr
-              className="cursor-pointer"
-              onClick={() => handleCircleClick("Ripening")}
-            >
-              <td className="flex items-center space-x-2">
-                <span
-                  className={`rounded-full w-5 h-5 ${
-                    selectedStages.Ripening ? "bg-green-500" : "bg-gray-300"
-                  }`}
-                ></span>
-                <span>Ripening</span>
-              </td>
-              <td className="text-right text-xs">(0.3 - 0.5)</td>
-            </tr>
+            {["Germination", "Tillering", "GrandGrowth", "Ripening"].map(
+              (stage) => (
+                <tr
+                  key={stage}
+                  className="cursor-pointer"
+                  onClick={() => handleCircleClick(stage)}
+                >
+                  <td className="flex items-center space-x-2">
+                    <span
+                      className={`rounded-full w-5 h-5 ${
+                        selectedStages[stage]
+                          ? {
+                              Germination: "bg-red-500",
+                              Tillering: "bg-orange-500",
+                              GrandGrowth: "bg-yellow-500",
+                              Ripening: "bg-green-500",
+                            }[stage]
+                          : "bg-gray-300"
+                      }`}
+                    ></span>
+                    <span>{stage.replace("GrandGrowth", "Grand Growth")}</span>
+                  </td>
+                  <td className="text-right text-xs">
+                    {
+                      {
+                        Germination: "(0.1 - 0.2)",
+                        Tillering: "(0.2 - 0.4)",
+                        GrandGrowth: "(0.5 - 0.7)",
+                        Ripening: "(0.3 - 0.5)",
+                      }[stage]
+                    }
+                  </td>
+                </tr>
+              )
+            )}
           </tbody>
         </table>
       </div>
+
       <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           About this Map
@@ -159,31 +137,56 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   );
 };
 
+const MapBoundsAdjuster = () => {
+  const map = useMap();
+  useEffect(() => {
+    if (map) {
+      map.fitBounds([
+        [4.5, 116.5],
+        [21.5, 126.5],
+      ]);
+    }
+  }, [map]);
+  return null;
+};
+
+const ZoomWatcher = ({ setZoom }) => {
+  useMapEvents({
+    zoomend: (e) => {
+      setZoom(e.target.getZoom());
+    },
+  });
+  return null;
+};
+
 const CheckHarvest = () => {
   const [ndviUrl, setNdviUrl] = useState(null);
   const [bounds, setBounds] = useState(null);
   const [sugarcaneLocations, setSugarcaneLocations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(7);
   const [selectedStages, setSelectedStages] = useState({
     Germination: true,
     Tillering: true,
     GrandGrowth: true,
     Ripening: true,
   });
-  const [minValidSugarcaneCount, setMinValidSugarcaneCount] = useState(20); // Minimum valid sugarcane count in a group
+  const [minValidSugarcaneCount, setMinValidSugarcaneCount] = useState(20);
+
   const mapRef = useRef(null);
 
-  // Define the bounds for the Philippines
   const philippinesBounds = [
-    [4.5, 116.5], // Southeast (Min Lat, Min Lon)
-    [21.5, 126.5], // Northwest (Max Lat, Max Lon)
+    [4.5, 116.5],
+    [21.5, 126.5],
   ];
 
-  // Define minZoom level based on the bounds of the Philippines
-  const minZoom = 1; // Suitable for viewing the whole Philippines
-
-  // Distance threshold for grouping markers (in meters)
-  const groupingThreshold = 5000; // Group sugarcane within 100 meters
+  const getDynamicThreshold = (zoom) => {
+    if (zoom >= 16) return 50;
+    if (zoom >= 14) return 150;
+    if (zoom >= 12) return 300;
+    if (zoom >= 10) return 500;
+    return 1000;
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -234,10 +237,10 @@ const CheckHarvest = () => {
     }));
   };
 
-  // Group locations based on proximity
   const groupLocations = (locations) => {
     let groups = [];
     let visited = new Set();
+    const threshold = getDynamicThreshold(zoomLevel);
 
     for (let i = 0; i < locations.length; i++) {
       if (visited.has(i)) continue;
@@ -252,7 +255,7 @@ const CheckHarvest = () => {
           L.latLng(locations[j].lat, locations[j].lng)
         );
 
-        if (dist < groupingThreshold) {
+        if (dist < threshold) {
           group.push(locations[j]);
           visited.add(j);
         }
@@ -266,20 +269,8 @@ const CheckHarvest = () => {
     return groups;
   };
 
-  const isValidGroup = (group) => group.length >= minValidSugarcaneCount;
-  const MapBoundsAdjuster = () => {
-    const map = useMap();
-    useEffect(() => {
-      if (map) {
-        map.fitBounds(philippinesBounds, { padding: [10, 10] });
-      }
-    }, [map]);
-    return null;
-  };
-
   return (
     <div className="flex h-screen">
-      {/* Sidebar */}
       <div className="bg-gradient-to-b from-green-50 to-green-200 w-1/4 bg-gray-50 p-6 border-r border-gray-300 overflow-y-auto">
         <Legend
           onSearch={searchLocation}
@@ -288,7 +279,6 @@ const CheckHarvest = () => {
         />
       </div>
 
-      {/* Map Section */}
       <div className="w-3/4 relative z-0">
         {loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-70 z-10">
@@ -304,55 +294,55 @@ const CheckHarvest = () => {
         ) : (
           <MapContainer
             style={{ height: "100vh", width: "100%" }}
-            bounds={bounds || philippinesBounds} // Fallback to Philippines bounds
+            bounds={bounds || philippinesBounds}
             ref={mapRef}
-            maxBounds={philippinesBounds} // Limit panning to the Philippines
-            maxZoom={24} // Restrict zooming level
-            minZoom={6} // Restrict zoom out level to view only the Philippines
-            maxBoundsViscosity={1.0} // Completely prevent zooming out past the max bounds
-            zoom={7} // Initial zoom level
-            scrollWheelZoom={true} // Enable scroll zooming if needed
+            maxBounds={philippinesBounds}
+            maxZoom={24}
+            minZoom={6}
+            maxBoundsViscosity={1.0}
+            zoom={7}
+            scrollWheelZoom={true}
           >
+            <ZoomWatcher setZoom={setZoomLevel} />
+            <MapBoundsAdjuster />
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            {bounds && <MapBoundsAdjuster bounds={bounds} />}
             {ndviUrl && bounds && (
               <ImageOverlay url={ndviUrl} bounds={bounds} opacity={0.7} />
             )}
-            {!loading &&
-              groupLocations(
-                sugarcaneLocations.filter(
-                  (location) => selectedStages[location.stage]
-                )
-              ).map((group, index) =>
-                group.slice(0, 10).map((location, locIndex) => (
-                  <CircleMarker
-                    key={`${index}-${locIndex}`}
-                    center={[location.lat, location.lng]}
-                    radius={5}
-                    pathOptions={{
-                      color: location.color,
-                      fillColor: location.color,
-                      fillOpacity: 0.5,
-                    }}
-                  >
-                    <Popup>
-                      <div className="rounded-md text-center">
-                        <span
-                          className={`font-bold text-lg ${getTextColor(
-                            location.stage
-                          )}`}
-                        >
-                          {location.stage}
-                        </span>
-                        <br />
-                        {location.stage === "Ripening"
-                          ? "✔️ Ready for Harvest"
-                          : "⏳ Not Ready"}
-                      </div>
-                    </Popup>
-                  </CircleMarker>
-                ))
-              )}
+            {groupLocations(
+              sugarcaneLocations.filter(
+                (location) => selectedStages[location.stage]
+              )
+            ).map((group, index) =>
+              group.slice(0, 10).map((location, locIndex) => (
+                <CircleMarker
+                  key={`${index}-${locIndex}`}
+                  center={[location.lat, location.lng]}
+                  radius={5}
+                  pathOptions={{
+                    color: location.color,
+                    fillColor: location.color,
+                    fillOpacity: 0.5,
+                  }}
+                >
+                  <Popup>
+                    <div className="rounded-md text-center">
+                      <span
+                        className={`font-bold text-lg ${getTextColor(
+                          location.stage
+                        )}`}
+                      >
+                        {location.stage}
+                      </span>
+                      <br />
+                      {location.stage === "Ripening"
+                        ? "✔️ Ready for Harvest"
+                        : "⏳ Not Ready"}
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              ))
+            )}
           </MapContainer>
         )}
       </div>

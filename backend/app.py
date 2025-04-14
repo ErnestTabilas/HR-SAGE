@@ -24,7 +24,9 @@ SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 
 GEO_TIFF_FILE_IDS = [
-    '1ZDiGhVDMdBSXpCotp4SE7JdHL-t7AU2',
+    '1Cyxesj3oA4x2ChwJg6txmNRMfzFd1oV2',    # Victorias
+    '1G5L9Ohj5IdXYQ-pvTbCFc0_8Lx0QqOK9',    # Negros
+    # '1ZDiGhVDMdBSXpCotp4SE7JdHL-t7AU2',
 	# '1PIF9403xplypmkUeA2ggn2APBZJQ9RRj',
 	# '13jV1svFsjbx1RyBLkQ9N2Wpy5i2xNgEH',
 	# '1tDmHBWlljP4nlxbzdNFn4H7MdyoFutGw',
