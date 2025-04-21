@@ -180,11 +180,11 @@ const CheckHarvest = () => {
   ];
 
   const getDynamicThreshold = (zoom) => {
-    if (zoom >= 16) return 500;
-    if (zoom >= 14) return 1500;
-    if (zoom >= 12) return 3000;
-    if (zoom >= 10) return 5000;
-    return 10000;
+    if (zoom >= 16) return 50;
+    if (zoom >= 14) return 150;
+    if (zoom >= 12) return 300;
+    if (zoom >= 10) return 500;
+    return 1000;
   };
 
   useEffect(() => {
