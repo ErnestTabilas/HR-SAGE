@@ -1,0 +1,82 @@
+// --- Step 1: Define known sugarcane farm regions --- //
+var luzon = ee.FeatureCollection([
+  ee.Feature(ee.Geometry.Rectangle([121.0, 16.8, 122.0, 17.8])), // Isabela
+  ee.Feature(ee.Geometry.Rectangle([120.3, 15.8, 120.7, 16.2])), // Pangasinan
+  ee.Feature(ee.Geometry.Rectangle([121.0, 13.5, 121.3, 14.0])), // Batangas
+  ee.Feature(ee.Geometry.Rectangle([120.4, 15.3, 120.7, 15.7])), // Tarlac
+  ee.Feature(ee.Geometry.Rectangle([120.8, 15.2, 121.2, 15.7]))  // Nueva Ecija
+]);
+
+var visayas = ee.FeatureCollection([
+  ee.Feature(ee.Geometry.Rectangle([122.3, 9.8, 123.0, 10.8])), // Negros Occidental
+  ee.Feature(ee.Geometry.Rectangle([123.0, 9.0, 123.5, 9.8])), // Negros Oriental
+  ee.Feature(ee.Geometry.Rectangle([124.8, 10.5, 125.4, 11.3])), // Leyte
+  ee.Feature(ee.Geometry.Rectangle([124.0, 9.8, 124.5, 10.5])), // Bohol
+  ee.Feature(ee.Geometry.Rectangle([123.5, 10.0, 124.0, 10.6]))  // Cebu
+]);
+
+var mindanao = ee.FeatureCollection([
+  ee.Feature(ee.Geometry.Rectangle([124.8, 7.8, 125.5, 8.6])), // Bukidnon
+  ee.Feature(ee.Geometry.Rectangle([125.0, 6.5, 125.6, 7.3])), // Davao del Sur
+  ee.Feature(ee.Geometry.Rectangle([122.9, 7.0, 123.7, 7.8])), // Zamboanga del Sur
+  ee.Feature(ee.Geometry.Rectangle([124.4, 6.5, 125.2, 7.3])), // Cotabato
+  ee.Feature(ee.Geometry.Rectangle([123.5, 8.2, 124.0, 8.8]))  // Misamis Occidental
+]);
+
+var allRegions = luzon.merge(visayas).merge(mindanao);
+
+// --- Step 2: Load Sentinel-2 SR & compute NDVI --- //
+var image = ee.ImageCollection('COPERNICUS/S2_SR')
+  .filterBounds(allRegions)
+  .filterDate('2024-01-01', '2024-12-31')
+  .select(['B4', 'B8']) // Red and NIR
+  .map(function(img) {
+    return img.clip(allRegions);
+  })
+  .median();
+
+var ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI');
+
+// --- Step 3: Mask non-cropland using Dynamic World --- //
+var landcover = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
+  .filterDate('2024-01-01', '2024-12-31')
+  .select('label')
+  .map(function(img) {
+    return img.clip(allRegions);
+  })
+  .median();
+
+var croplandMask = landcover.eq(3);  // Cropland = 3
+var waterMask = landcover.eq(0);     // Water = 0
+var roadMask = landcover.eq(2);      // Built-up = 2 (roads included)
+
+var excludeMask = waterMask.or(roadMask);
+
+// Apply cropland mask and exclude water/roads
+var ndviMasked = ndvi.updateMask(croplandMask).updateMask(excludeMask.not());
+
+// --- Step 4: Apply slope filter using SRTM --- //
+var dem = ee.Image("USGS/SRTMGL1_003");
+var slope = ee.Terrain.slope(dem);
+var flatAreas = slope.lt(15); // Allow slope < 15 degrees
+var finalNDVI = ndviMasked.updateMask(flatAreas);
+
+// --- Step 5: Export per region --- //
+var regionsList = allRegions.toList(allRegions.size());
+
+print('Total Regions:', regionsList.size());
+
+for (var i = 0; i < regionsList.size().getInfo(); i++) {
+  var region = ee.Feature(regionsList.get(i));
+  print('Exporting Region:', region.geometry());
+
+  Export.image.toDrive({
+    image: finalNDVI.clip(region.geometry()),
+    description: 'NDVI_Sugarcane_Region_' + i,
+    scale: 30,
+    region: region.geometry(),
+    maxPixels: 1e13
+  });
+}
+
+print('All export tasks triggered.');

@@ -13,6 +13,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
+import debounce from "lodash.debounce";
 
 const getTextColor = (growthStage) => {
   switch (growthStage) {
@@ -152,16 +153,14 @@ const MapBoundsAdjuster = () => {
 
 const ZoomWatcher = ({ setZoom }) => {
   useMapEvents({
-    zoomend: (e) => {
+    zoomend: debounce((e) => {
       setZoom(e.target.getZoom());
-    },
+    }, 250),
   });
   return null;
 };
 
 const CheckHarvest = () => {
-  const [ndviUrl, setNdviUrl] = useState(null);
-  const [bounds, setBounds] = useState(null);
   const [sugarcaneLocations, setSugarcaneLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(7);
@@ -172,8 +171,8 @@ const CheckHarvest = () => {
     Ripening: true,
   });
   const [minValidSugarcaneCount, setMinValidSugarcaneCount] = useState(20);
-
   const mapRef = useRef(null);
+  const [visibleBounds, setVisibleBounds] = useState(null);
 
   const philippinesBounds = [
     [4.5, 116.5],
@@ -181,16 +180,15 @@ const CheckHarvest = () => {
   ];
 
   const getDynamicThreshold = (zoom) => {
-    if (zoom >= 16) return 50;
-    if (zoom >= 14) return 150;
-    if (zoom >= 12) return 300;
-    if (zoom >= 10) return 500;
-    return 1000;
+    if (zoom >= 16) return 500;
+    if (zoom >= 14) return 1500;
+    if (zoom >= 12) return 3000;
+    if (zoom >= 10) return 5000;
+    return 10000;
   };
 
   useEffect(() => {
     setLoading(true);
-
     axios
       .get("http://127.0.0.1:5000/sugarcane-locations")
       .then((response) => {
@@ -203,33 +201,6 @@ const CheckHarvest = () => {
       );
   }, []);
 
-  const searchLocation = async (query) => {
-    try {
-      const response = await axios.get(
-        `https://nominatim.openstreetmap.org/search`,
-        {
-          params: {
-            q: query,
-            format: "json",
-            countrycodes: "PH",
-            limit: 1,
-          },
-        }
-      );
-
-      if (response.data.length > 0) {
-        const { lat, lon } = response.data[0];
-        if (mapRef.current) {
-          mapRef.current.setView([parseFloat(lat), parseFloat(lon)], 15);
-        }
-      } else {
-        alert("Location not found. Try a different search.");
-      }
-    } catch (error) {
-      console.error("Error searching location:", error);
-    }
-  };
-
   const handleToggleStage = (stage) => {
     setSelectedStages((prevState) => ({
       ...prevState,
@@ -237,30 +208,25 @@ const CheckHarvest = () => {
     }));
   };
 
-  const groupLocations = (locations) => {
-    let groups = [];
-    let visited = new Set();
+  const getClusters = (locations) => {
+    const groups = [];
+    const visited = new Set();
     const threshold = getDynamicThreshold(zoomLevel);
 
     for (let i = 0; i < locations.length; i++) {
       if (visited.has(i)) continue;
-
       let group = [locations[i]];
       visited.add(i);
-
       for (let j = i + 1; j < locations.length; j++) {
         if (visited.has(j)) continue;
-
         const dist = L.latLng(locations[i].lat, locations[i].lng).distanceTo(
           L.latLng(locations[j].lat, locations[j].lng)
         );
-
         if (dist < threshold) {
           group.push(locations[j]);
           visited.add(j);
         }
       }
-
       if (group.length >= minValidSugarcaneCount) {
         groups.push(group);
       }
@@ -269,17 +235,62 @@ const CheckHarvest = () => {
     return groups;
   };
 
+  const mapVisibleClusters = () => {
+    if (!visibleBounds) return [];
+
+    const bounds = L.latLngBounds(visibleBounds);
+    const filtered = sugarcaneLocations.filter(
+      (loc) =>
+        selectedStages[loc.stage] && bounds.contains(L.latLng(loc.lat, loc.lng))
+    );
+
+    return getClusters(filtered);
+  };
+
+  const ZoomWatcher = () => {
+    useMapEvents({
+      zoomend: (e) => {
+        setZoomLevel(e.target.getZoom());
+      },
+      moveend: (e) => {
+        setVisibleBounds(e.target.getBounds());
+      },
+    });
+    return null;
+  };
+
   return (
     <div className="flex h-screen">
-      <div className="bg-gradient-to-b from-green-50 to-green-200 w-1/4 bg-gray-50 p-6 border-r border-gray-300 overflow-y-auto">
+      {/* Sidebar */}
+      <div className="bg-gradient-to-b from-green-50 to-green-200 w-1/4 p-6 border-r border-gray-300 overflow-y-auto">
         <Legend
-          onSearch={searchLocation}
+          onSearch={(query) => {
+            axios
+              .get(`https://nominatim.openstreetmap.org/search`, {
+                params: {
+                  q: query,
+                  format: "json",
+                  countrycodes: "PH",
+                  limit: 1,
+                },
+              })
+              .then((response) => {
+                if (response.data.length > 0) {
+                  const { lat, lon } = response.data[0];
+                  mapRef.current.setView(
+                    [parseFloat(lat), parseFloat(lon)],
+                    15
+                  );
+                }
+              });
+          }}
           selectedStages={selectedStages}
           onToggleStage={handleToggleStage}
         />
       </div>
 
-      <div className="w-3/4 relative z-0">
+      {/* Map */}
+      <div className="w-3/4 relative">
         {loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-70 z-10">
             <FontAwesomeIcon
@@ -294,55 +305,51 @@ const CheckHarvest = () => {
         ) : (
           <MapContainer
             style={{ height: "100vh", width: "100%" }}
-            bounds={bounds || philippinesBounds}
+            bounds={philippinesBounds}
             ref={mapRef}
-            maxBounds={philippinesBounds}
+            zoom={7}
             maxZoom={24}
             minZoom={6}
+            maxBounds={philippinesBounds}
             maxBoundsViscosity={1.0}
-            zoom={7}
             scrollWheelZoom={true}
           >
-            <ZoomWatcher setZoom={setZoomLevel} />
-            <MapBoundsAdjuster />
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            {ndviUrl && bounds && (
-              <ImageOverlay url={ndviUrl} bounds={bounds} opacity={0.7} />
-            )}
-            {groupLocations(
-              sugarcaneLocations.filter(
-                (location) => selectedStages[location.stage]
-              )
-            ).map((group, index) =>
-              group.slice(0, 10).map((location, locIndex) => (
+            <ZoomWatcher />
+            <MapBoundsAdjuster />
+
+            {/* Render only one marker per cluster */}
+            {mapVisibleClusters().map((group, idx) => {
+              const center = group[0]; // pick the first point in the cluster
+              return (
                 <CircleMarker
-                  key={`${index}-${locIndex}`}
-                  center={[location.lat, location.lng]}
+                  key={idx}
+                  center={[center.lat, center.lng]}
                   radius={5}
                   pathOptions={{
-                    color: location.color,
-                    fillColor: location.color,
+                    color: center.color,
+                    fillColor: center.color,
                     fillOpacity: 0.5,
                   }}
                 >
                   <Popup>
-                    <div className="rounded-md text-center">
+                    <div className="text-center">
                       <span
                         className={`font-bold text-lg ${getTextColor(
-                          location.stage
+                          center.stage
                         )}`}
                       >
-                        {location.stage}
+                        {center.stage}
                       </span>
                       <br />
-                      {location.stage === "Ripening"
+                      {center.stage === "Ripening"
                         ? "✔️ Ready for Harvest"
                         : "⏳ Not Ready"}
                     </div>
                   </Popup>
                 </CircleMarker>
-              ))
-            )}
+              );
+            })}
           </MapContainer>
         )}
       </div>

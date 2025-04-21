@@ -9,6 +9,9 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 from googleapiclient.http import MediaIoBaseDownload
 from rasterio.merge import merge
+from skimage.filters.rank import entropy
+from skimage.morphology import disk
+from scipy.ndimage import generic_gradient_magnitude, sobel
 
 # Set up basic logging
 logging.basicConfig(level=logging.DEBUG)
@@ -16,35 +19,36 @@ logging.basicConfig(level=logging.DEBUG)
 app = Flask(__name__)
 CORS(app)
 
-# Get the current working directory (where app.py is located)
+# Paths
 current_dir = os.path.dirname(os.path.abspath(__file__))
+SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
 
 # Google Drive API setup
-SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-
 GEO_TIFF_FILE_IDS = [
-    '1Cyxesj3oA4x2ChwJg6txmNRMfzFd1oV2',    # Victorias
-    '1G5L9Ohj5IdXYQ-pvTbCFc0_8Lx0QqOK9',    # Negros
-    # '1ZDiGhVDMdBSXpCotp4SE7JdHL-t7AU2',
-	# '1PIF9403xplypmkUeA2ggn2APBZJQ9RRj',
-	# '13jV1svFsjbx1RyBLkQ9N2Wpy5i2xNgEH',
-	# '1tDmHBWlljP4nlxbzdNFn4H7MdyoFutGw',
-	# '19j2vmYYMF5DA0ek2zL54Z2FAczQ4T3XP',
-	# '1y-blbykzzViV1oX9PLdOR_OF6qomsG4b',
-	# '1iA2Z6rS61AqMZJdeIBXF6KmKHAeD4rGZ',
-	# '1l1KuSJEGb8d9huIZGFbHFWwgqqvrmVaB',
-	# '1BJrbi_wtt64PYoYaDy4SPIJQWxLfNDpb'
+    '1xmXw1clBj5MdNfW9iFX5x9w9mvZxRJDc', # Region 0
+    '1TxEly6CEG6GRXt3z8bh-wslyl98AmyQh', # Region 1
+    '1Y3dMrRX2uxN_MvkzvpQXxsy0cpdv-Ek5', # Region 2
+    '11Ecy5TGYPd5ouP7Bmbb-pB2iS7dYG-zN', # Region 3
+    '1BexjvZoUKlfZHDQcLRV47rfZsEN-CxMY', # Region 4
+    '1EPHJdxHxzxWgFlZ1RvzWlOk7KvRmM7ae', # Region 5
+    '1a-nrWiZam65NQCU9DugnlL22ovxlMybn', # Region 6
+    '1RT-jUSv-gq6fDwP-KkkUVc-nVwrU7l6J', # Region 7
+    '188YkSm9U3lZncgNz3a9HVxVfeJrzHJVX', # Region 8
+    '1uIrsbt9eG-S4B9P4kohx1NgjjXbDRkr1', # Region 9
+    '1N6kpNL37jZIs2wHw559lKaUsNNLL0GVT', # Region 10
+    '125TiTyAC2FaiuZv9qvylBasQk75GaU1J', # Region 11
+    '1iNpYUNFiOQkFNDX5834xPtx9CZWgpxOw', # Region 12
+    '1nhKks0z_lkzFhnYesZZhAbgXMMYU8-iG', # Region 13
+    '12xJ9ECic8r5u5XOEABVCJz74f6g1p_mw' # Region 14
+
 ]
 
-# Authenticate using the service account
-credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES
-)
+# Authenticate
+credentials = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 drive_service = build("drive", "v3", credentials=credentials)
 
 def classify_growth_stage(ndvi_value):
-    """Classify the growth stage based on NDVI value."""
     if ndvi_value >= 0.5:
         return "Grand Growth", "yellow"
     elif ndvi_value >= 0.3:
@@ -55,52 +59,35 @@ def classify_growth_stage(ndvi_value):
         return "Germination", "red"
     else:
         return "No Sugarcane", "gray"
-    
+
 def download_geotiff_from_drive(file_id):
-    """Downloads the GeoTIFF file from Google Drive and returns it as a BytesIO object."""
     try:
         request = drive_service.files().get_media(fileId=file_id)
         fh = io.BytesIO()
         downloader = MediaIoBaseDownload(fh, request)
         done = False
-        while done is False:
+        while not done:
             status, done = downloader.next_chunk()
             logging.debug("Download %d%%.", int(status.progress() * 100))
-        fh.seek(0)  # Reset the pointer to the start of the file
-        logging.info(f"GeoTIFF file with ID {file_id} downloaded successfully from Google Drive.")
+        fh.seek(0)
+        logging.info(f"GeoTIFF {file_id} downloaded successfully.")
         return fh
     except Exception as e:
-        logging.error(f"Failed to download GeoTIFF with ID {file_id}: {str(e)}")
+        logging.error(f"GeoTIFF download failed: {str(e)}")
         return None
 
 @app.route('/ndvi-data', methods=['GET'])
 def get_ndvi_data():
     try:
-        logging.debug("Fetching GeoTIFF files from Google Drive")
-        file_data_list = []
-        for file_id in GEO_TIFF_FILE_IDS:
-            file_data = download_geotiff_from_drive(file_id)
-            if file_data:
-                file_data_list.append(file_data)
-        
+        file_data_list = [download_geotiff_from_drive(fid) for fid in GEO_TIFF_FILE_IDS]
+        file_data_list = [f for f in file_data_list if f]
+
         if not file_data_list:
             return jsonify({"error": "GeoTIFF download failed"}), 500
-        
-        # Merge multiple GeoTIFFs into one if needed
-        datasets = []
-        for file_data in file_data_list:
-            try:
-                dataset = rasterio.open(file_data)
-                datasets.append(dataset)
-            except Exception as e:
-                logging.error(f"Failed to open GeoTIFF file: {str(e)}")
-        
-        if not datasets:
-            return jsonify({"error": "Failed to open GeoTIFF files"}), 500
 
+        datasets = [rasterio.open(f) for f in file_data_list]
         mosaic, transform = merge(datasets)
-        
-        # Get image bounds (min and max lat/lon) from the merged raster
+
         min_lon, min_lat = rasterio.transform.xy(transform, 0, 0)
         max_lon, max_lat = rasterio.transform.xy(transform, mosaic.shape[1]-1, mosaic.shape[0]-1)
 
@@ -112,47 +99,43 @@ def get_ndvi_data():
         })
 
     except Exception as e:
-        logging.error(f"Error in /ndvi-data endpoint: {str(e)}")
+        logging.error(f"/ndvi-data error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 @app.route("/sugarcane-locations", methods=["GET"])
 def get_sugarcane_locations():
     try:
-        logging.debug("Fetching GeoTIFF files from Google Drive")
-        file_data_list = []
-        for file_id in GEO_TIFF_FILE_IDS:
-            file_data = download_geotiff_from_drive(file_id)
-            if file_data:
-                file_data_list.append(file_data)
-        
+        file_data_list = [download_geotiff_from_drive(fid) for fid in GEO_TIFF_FILE_IDS]
+        file_data_list = [f for f in file_data_list if f]
+
         if not file_data_list:
             return jsonify({"error": "GeoTIFF download failed"}), 500
 
-        datasets = []
-        for file_data in file_data_list:
-            try:
-                dataset = rasterio.open(file_data)
-                datasets.append(dataset)
-            except Exception as e:
-                logging.error(f"Failed to open GeoTIFF file: {str(e)}")
-        
-        if not datasets:
-            return jsonify({"error": "Failed to open GeoTIFF files"}), 500
-
+        datasets = [rasterio.open(f) for f in file_data_list]
         mosaic, transform = merge(datasets)
 
-        # Read the merged raster data into a numpy array
-        raster_data = mosaic[0]  # Assuming it's a sixngle-band raster
-        sugarcane_mask = (raster_data > 0.1) & (raster_data <= 1.0)  # Mask for sugarcane
+        raster_data = mosaic[0]  # NDVI values
+        sugarcane_mask = (raster_data > 0.1) & (raster_data <= 1.0)
+
+        # === Entropy Filtering ===
+        logging.info("Applying entropy-based texture filtering...")
+        ndvi_scaled = ((raster_data - np.nanmin(raster_data)) / (np.nanmax(raster_data) - np.nanmin(raster_data)) * 255).astype(np.uint8)
+        entropy_filtered = entropy(ndvi_scaled, disk(2))
+        entropy_mask = entropy_filtered > 2.0  # Empirical threshold
+
+        # === Optional: Slope Filtering using gradient magnitude ===
+        logging.info("Applying slope filtering...")
+        slope_mask = generic_gradient_magnitude(raster_data, sobel) < 20  # Gentle slopes preferred
+
+        combined_mask = sugarcane_mask & entropy_mask & slope_mask
 
         sugarcane_locations = []
-        for row in range(sugarcane_mask.shape[0]):
-            for col in range(sugarcane_mask.shape[1]):
-                if sugarcane_mask[row, col]:
+        for row in range(combined_mask.shape[0]):
+            for col in range(combined_mask.shape[1]):
+                if combined_mask[row, col]:
                     lon, lat = transform * (col, row)
                     ndvi_value = raster_data[row, col]
                     stage, color = classify_growth_stage(ndvi_value)
-                    
                     sugarcane_locations.append({
                         "lat": lat,
                         "lng": lon,
@@ -160,11 +143,11 @@ def get_sugarcane_locations():
                         "color": color
                     })
 
-        logging.debug(f"Found {len(sugarcane_locations)} sugarcane locations.")
+        logging.debug(f"Returning {len(sugarcane_locations)} sugarcane points.")
         return jsonify(sugarcane_locations)
 
     except Exception as e:
-        logging.error(f"Error in /sugarcane-locations endpoint: {str(e)}")
+        logging.error(f"/sugarcane-locations error: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

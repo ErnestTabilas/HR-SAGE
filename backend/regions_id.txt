@@ -36,3 +36,19 @@
 	'1iA2Z6rS61AqMZJdeIBXF6KmKHAeD4rGZ',
 	'1l1KuSJEGb8d9huIZGFbHFWwgqqvrmVaB',
 	'1BJrbi_wtt64PYoYaDy4SPIJQWxLfNDpb'
+    #--------------- SLOPES AND DEM -----------------------
+    '1xmXw1clBj5MdNfW9iFX5x9w9mvZxRJDc', # Region 0
+    '1TxEly6CEG6GRXt3z8bh-wslyl98AmyQh', # Region 1
+    '1Y3dMrRX2uxN_MvkzvpQXxsy0cpdv-Ek5', # Region 2
+    '11Ecy5TGYPd5ouP7Bmbb-pB2iS7dYG-zN', # Region 3
+    '1BexjvZoUKlfZHDQcLRV47rfZsEN-CxMY', # Region 4
+    '1EPHJdxHxzxWgFlZ1RvzWlOk7KvRmM7ae', # Region 5
+    '1a-nrWiZam65NQCU9DugnlL22ovxlMybn', # Region 6
+    '1RT-jUSv-gq6fDwP-KkkUVc-nVwrU7l6J', # Region 7
+    '188YkSm9U3lZncgNz3a9HVxVfeJrzHJVX', # Region 8
+    '1uIrsbt9eG-S4B9P4kohx1NgjjXbDRkr1', # Region 9
+    '1N6kpNL37jZIs2wHw559lKaUsNNLL0GVT', # Region 10
+    '125TiTyAC2FaiuZv9qvylBasQk75GaU1J', # Region 11
+    '1iNpYUNFiOQkFNDX5834xPtx9CZWgpxOw', # Region 12
+    '1nhKks0z_lkzFhnYesZZhAbgXMMYU8-iG', # Region 13
+    '12xJ9ECic8r5u5XOEABVCJz74f6g1p_mw' # Region 14
