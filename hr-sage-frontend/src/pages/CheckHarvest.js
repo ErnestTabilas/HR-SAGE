@@ -5,27 +5,28 @@ import {
   ImageOverlay,
   useMap,
   useMapEvents,
+  CircleMarker,
+  Popup,
 } from "react-leaflet";
 import L from "leaflet";
-import * as d3 from "d3";
-import { hexbin as d3Hexbin } from "d3-hexbin";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
+import debounce from "lodash.debounce";
 
-const getColor = (stage) => {
-  switch (stage) {
+const getTextColor = (growthStage) => {
+  switch (growthStage) {
     case "Germination":
-      return "#ef4444"; // red
+      return "text-red-500";
     case "Tillering":
-      return "#f97316"; // orange
+      return "text-orange-500";
     case "Grand Growth":
-      return "#eab308"; // yellow
+      return "text-yellow-500";
     case "Ripening":
-      return "#22c55e"; // green
+      return "text-green-500";
     default:
-      return "#9ca3af"; // gray
+      return "text-gray-500";
   }
 };
 
@@ -33,17 +34,14 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const handleSearch = () => {
-    if (searchTerm.trim() !== "") onSearch(searchTerm);
+    if (searchTerm.trim() !== "") {
+      onSearch(searchTerm);
+    }
   };
 
-  const handleCircleClick = (stage) => onToggleStage(stage);
-
-  const stageInfo = [
-    { name: "Germination", color: "bg-red-500", range: "(0.1 - 0.2)" },
-    { name: "Tillering", color: "bg-orange-500", range: "(0.2 - 0.4)" },
-    { name: "Grand Growth", color: "bg-yellow-500", range: "(0.5 - 0.7)" },
-    { name: "Ripening", color: "bg-green-500", range: "(0.3 - 0.5)" },
-  ];
+  const handleCircleClick = (stage) => {
+    onToggleStage(stage);
+  };
 
   return (
     <div className="space-y-4 px-4">
@@ -75,28 +73,50 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
         <table className="w-full">
           <thead>
             <tr>
-              <th className="text-left font-semibold pb-2">Stage</th>
-              <th className="text-right font-semibold pb-2">NDVI Value</th>
+              <th className="text-left text-gray-700 font-semibold pb-2">
+                Stage
+              </th>
+              <th className="text-right text-gray-700 font-semibold pb-2">
+                NDVI Value
+              </th>
             </tr>
           </thead>
           <tbody>
-            {stageInfo.map((stage) => (
-              <tr
-                key={stage.name}
-                className="cursor-pointer"
-                onClick={() => handleCircleClick(stage.name)}
-              >
-                <td className="flex items-center space-x-2">
-                  <span
-                    className={`rounded-full w-5 h-5 ${
-                      selectedStages[stage.name] ? stage.color : "bg-gray-300"
-                    }`}
-                  ></span>
-                  <span>{stage.name}</span>
-                </td>
-                <td className="text-right text-xs">{stage.range}</td>
-              </tr>
-            ))}
+            {["Germination", "Tillering", "GrandGrowth", "Ripening"].map(
+              (stage) => (
+                <tr
+                  key={stage}
+                  className="cursor-pointer"
+                  onClick={() => handleCircleClick(stage)}
+                >
+                  <td className="flex items-center space-x-2">
+                    <span
+                      className={`rounded-full w-5 h-5 ${
+                        selectedStages[stage]
+                          ? {
+                              Germination: "bg-red-500",
+                              Tillering: "bg-orange-500",
+                              GrandGrowth: "bg-yellow-500",
+                              Ripening: "bg-green-500",
+                            }[stage]
+                          : "bg-gray-300"
+                      }`}
+                    ></span>
+                    <span>{stage.replace("GrandGrowth", "Grand Growth")}</span>
+                  </td>
+                  <td className="text-right text-xs">
+                    {
+                      {
+                        Germination: "(0.1 - 0.2)",
+                        Tillering: "(0.2 - 0.4)",
+                        GrandGrowth: "(0.5 - 0.7)",
+                        Ripening: "(0.3 - 0.5)",
+                      }[stage]
+                    }
+                  </td>
+                </tr>
+              )
+            )}
           </tbody>
         </table>
       </div>
@@ -106,8 +126,12 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
           About this Map
         </h4>
         <p className="text-sm text-gray-600 leading-relaxed">
-          This map visualizes sugarcane farm growth stages using NDVI. Markers
-          are grouped into hex bins to enhance performance and readability.
+          This map visualizes the sugarcane farm growth stages based on NDVI.
+          The colors represent different stages of growth. You can click on the
+          ellipses on the Legend panel to select which crop stage are visible on
+          the map. Clicking an ellipse on the map will show you the selected
+          crop's growth stage and harvest readiness. You can also search for
+          places in the Philippines using the search function.
         </p>
       </div>
     </div>
@@ -127,100 +151,49 @@ const MapBoundsAdjuster = () => {
   return null;
 };
 
-const drawHexbins = (map, locations, selectedStages) => {
-  if (!map || !locations.length) return;
-
-  const container = d3.select(map.getPanes().overlayPane);
-  container.selectAll("svg").remove();
-
-  const svg = container.append("svg");
-  const g = svg.append("g").attr("class", "leaflet-zoom-hide");
-
-  const transform = d3.geoTransform({
-    point: function (x, y) {
-      const point = map.latLngToLayerPoint(new L.LatLng(y, x));
-      this.stream.point(point.x, point.y);
-    },
+const ZoomWatcher = ({ setZoom }) => {
+  useMapEvents({
+    zoomend: debounce((e) => {
+      setZoom(e.target.getZoom());
+    }, 250),
   });
-
-  const path = d3.geoPath().projection(transform);
-
-  const width = map.getSize().x;
-  const height = map.getSize().y;
-  svg.attr("width", width).attr("height", height);
-
-  const hexRadius = 12;
-  const hexbin = d3Hexbin()
-    .radius(hexRadius)
-    .x((d) => d[0])
-    .y((d) => d[1]);
-
-  const filtered = locations.filter((d) => selectedStages[d.stage]);
-  const screenPoints = filtered.map((d) =>
-    map.latLngToLayerPoint([d.lat, d.lng])
-  );
-
-  const hexPoints = filtered.map((d) => {
-    const point = map.latLngToLayerPoint([d.lat, d.lng]);
-    return [point.x, point.y, d.stage];
-  });
-
-  const bins = hexbin(hexPoints);
-
-  g.selectAll(".hexagon")
-    .data(bins)
-    .enter()
-    .append("path")
-    .attr("class", "hexagon")
-    .attr("d", (d) => hexbin.hexagon())
-    .attr("transform", (d) => `translate(${d.x},${d.y})`)
-    .attr("fill", (d) => {
-      const stage = d[0][2];
-      return getColor(stage);
-    })
-    .attr("fill-opacity", 0.5)
-    .attr("stroke", "#222")
-    .attr("stroke-width", 0.5);
-};
-
-const HexbinLayer = ({ data, selectedStages }) => {
-  const map = useMap();
-
-  useEffect(() => {
-    drawHexbins(map, data, selectedStages);
-
-    const redraw = () => drawHexbins(map, data, selectedStages);
-    map.on("zoomend moveend", redraw);
-    return () => {
-      map.off("zoomend moveend", redraw);
-    };
-  }, [map, data, selectedStages]);
-
   return null;
 };
 
 const CheckHarvest = () => {
   const [sugarcaneLocations, setSugarcaneLocations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(7);
   const [selectedStages, setSelectedStages] = useState({
     Germination: true,
     Tillering: true,
-    "Grand Growth": true,
+    GrandGrowth: true,
     Ripening: true,
   });
-
+  const [minValidSugarcaneCount, setMinValidSugarcaneCount] = useState(20);
   const mapRef = useRef(null);
+  const [visibleBounds, setVisibleBounds] = useState(null);
 
   const philippinesBounds = [
     [4.5, 116.5],
     [21.5, 126.5],
   ];
 
+  const getDynamicThreshold = (zoom) => {
+    if (zoom >= 16) return 50;
+    if (zoom >= 14) return 150;
+    if (zoom >= 12) return 300;
+    if (zoom >= 10) return 500;
+    return 1000;
+  };
+
   useEffect(() => {
+    setLoading(true);
     axios
       .get("http://127.0.0.1:5000/sugarcane-locations")
       .then((response) => {
-        setSugarcaneLocations(response.data);
+        const locations = Array.isArray(response.data) ? response.data : [];
+        setSugarcaneLocations(locations);
         setLoading(false);
       })
       .catch((error) =>
@@ -229,48 +202,95 @@ const CheckHarvest = () => {
   }, []);
 
   const handleToggleStage = (stage) => {
-    setSelectedStages((prev) => ({
-      ...prev,
-      [stage]: !prev[stage],
+    setSelectedStages((prevState) => ({
+      ...prevState,
+      [stage]: !prevState[stage],
     }));
   };
 
-  const searchLocation = async (query) => {
-    try {
-      const response = await axios.get(
-        `https://nominatim.openstreetmap.org/search`,
-        {
-          params: {
-            q: query,
-            format: "json",
-            countrycodes: "PH",
-            limit: 1,
-          },
-        }
-      );
+  const getClusters = (locations) => {
+    const groups = [];
+    const visited = new Set();
+    const threshold = getDynamicThreshold(zoomLevel);
 
-      if (response.data.length > 0) {
-        const { lat, lon } = response.data[0];
-        mapRef.current.setView([parseFloat(lat), parseFloat(lon)], 15);
-      } else {
-        alert("Location not found.");
+    for (let i = 0; i < locations.length; i++) {
+      if (visited.has(i)) continue;
+      let group = [locations[i]];
+      visited.add(i);
+      for (let j = i + 1; j < locations.length; j++) {
+        if (visited.has(j)) continue;
+        const dist = L.latLng(locations[i].lat, locations[i].lng).distanceTo(
+          L.latLng(locations[j].lat, locations[j].lng)
+        );
+        if (dist < threshold) {
+          group.push(locations[j]);
+          visited.add(j);
+        }
       }
-    } catch (err) {
-      console.error("Search failed:", err);
+      if (group.length >= minValidSugarcaneCount) {
+        groups.push(group);
+      }
     }
+
+    return groups;
+  };
+
+  const mapVisibleClusters = () => {
+    if (!visibleBounds) return [];
+
+    const bounds = L.latLngBounds(visibleBounds);
+    const filtered = sugarcaneLocations.filter(
+      (loc) =>
+        selectedStages[loc.stage] && bounds.contains(L.latLng(loc.lat, loc.lng))
+    );
+
+    return getClusters(filtered);
+  };
+
+  const ZoomWatcher = () => {
+    useMapEvents({
+      zoomend: (e) => {
+        setZoomLevel(e.target.getZoom());
+      },
+      moveend: (e) => {
+        setVisibleBounds(e.target.getBounds());
+      },
+    });
+    return null;
   };
 
   return (
     <div className="flex h-screen">
-      <div className="bg-green-50 w-1/4 p-6 overflow-y-auto border-r">
+      {/* Sidebar */}
+      <div className="bg-gradient-to-b from-green-50 to-green-200 w-1/4 p-6 border-r border-gray-300 overflow-y-auto">
         <Legend
-          onSearch={searchLocation}
+          onSearch={(query) => {
+            axios
+              .get(`https://nominatim.openstreetmap.org/search`, {
+                params: {
+                  q: query,
+                  format: "json",
+                  countrycodes: "PH",
+                  limit: 1,
+                },
+              })
+              .then((response) => {
+                if (response.data.length > 0) {
+                  const { lat, lon } = response.data[0];
+                  mapRef.current.setView(
+                    [parseFloat(lat), parseFloat(lon)],
+                    15
+                  );
+                }
+              });
+          }}
           selectedStages={selectedStages}
           onToggleStage={handleToggleStage}
         />
       </div>
 
-      <div className="w-3/4 relative z-0">
+      {/* Map */}
+      <div className="w-3/4 relative">
         {loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-70 z-10">
             <FontAwesomeIcon
@@ -284,22 +304,52 @@ const CheckHarvest = () => {
           </div>
         ) : (
           <MapContainer
-            ref={mapRef}
             style={{ height: "100vh", width: "100%" }}
             bounds={philippinesBounds}
-            maxBounds={philippinesBounds}
+            ref={mapRef}
             zoom={7}
-            minZoom={6}
             maxZoom={24}
-            scrollWheelZoom={true}
+            minZoom={6}
+            maxBounds={philippinesBounds}
             maxBoundsViscosity={1.0}
+            scrollWheelZoom={true}
           >
-            <MapBoundsAdjuster />
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <HexbinLayer
-              data={sugarcaneLocations}
-              selectedStages={selectedStages}
-            />
+            <ZoomWatcher />
+            <MapBoundsAdjuster />
+
+            {/* Render only one marker per cluster */}
+            {mapVisibleClusters().map((group, idx) => {
+              const center = group[0]; // pick the first point in the cluster
+              return (
+                <CircleMarker
+                  key={idx}
+                  center={[center.lat, center.lng]}
+                  radius={5}
+                  pathOptions={{
+                    color: center.color,
+                    fillColor: center.color,
+                    fillOpacity: 0.5,
+                  }}
+                >
+                  <Popup>
+                    <div className="text-center">
+                      <span
+                        className={`font-bold text-lg ${getTextColor(
+                          center.stage
+                        )}`}
+                      >
+                        {center.stage}
+                      </span>
+                      <br />
+                      {center.stage === "Ripening"
+                        ? "✔️ Ready for Harvest"
+                        : "⏳ Not Ready"}
+                    </div>
+                  </Popup>
+                </CircleMarker>
+              );
+            })}
           </MapContainer>
         )}
       </div>
