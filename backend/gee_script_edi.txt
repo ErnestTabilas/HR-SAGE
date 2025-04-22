@@ -1,0 +1,127 @@
+// === STEP 1: Define sugarcane‐producing regions ===
+var luzon = ee.FeatureCollection([
+  ee.Feature(ee.Geometry.Rectangle([121.0, 16.8, 122.0, 17.8])), // Isabela
+  ee.Feature(ee.Geometry.Rectangle([120.3, 15.8, 120.7, 16.2])), // Pangasinan
+  ee.Feature(ee.Geometry.Rectangle([121.0, 13.5, 121.3, 14.0])), // Batangas
+  ee.Feature(ee.Geometry.Rectangle([120.4, 15.3, 120.7, 15.7])), // Tarlac
+  ee.Feature(ee.Geometry.Rectangle([120.8, 15.2, 121.2, 15.7]))  // Nueva Ecija
+]);
+var visayas = ee.FeatureCollection([
+  ee.Feature(ee.Geometry.Rectangle([122.3,  9.8, 123.0, 10.8])), // Negros Occ.
+  ee.Feature(ee.Geometry.Rectangle([123.0,  9.0, 123.5,  9.8])), // Negros Ori.
+  ee.Feature(ee.Geometry.Rectangle([124.8, 10.5, 125.4, 11.3])), // Leyte
+  ee.Feature(ee.Geometry.Rectangle([124.0,  9.8, 124.5, 10.5])), // Bohol
+  ee.Feature(ee.Geometry.Rectangle([123.5, 10.0, 124.0, 10.6]))  // Cebu
+]);
+var mindanao = ee.FeatureCollection([
+  ee.Feature(ee.Geometry.Rectangle([124.8,  7.8, 125.5,  8.6])), // Bukidnon
+  ee.Feature(ee.Geometry.Rectangle([125.0,  6.5, 125.6,  7.3])), // Davao del Sur
+  ee.Feature(ee.Geometry.Rectangle([122.9,  7.0, 123.7,  7.8])), // Zamboanga del Sur
+  ee.Feature(ee.Geometry.Rectangle([124.4,  6.5, 125.2,  7.3])), // Cotabato
+  ee.Feature(ee.Geometry.Rectangle([123.5,  8.2, 124.0,  8.8]))  // Misamis Occ.
+]);
+var allRegions = luzon.merge(visayas).merge(mindanao);
+
+// === STEP 2: Load Sentinel‐2, compute NDVI & EVI ===
+var s2 = ee.ImageCollection('COPERNICUS/S2_SR')
+  .filterBounds(allRegions)
+  .filterDate('2024-01-01','2024-12-31')
+  .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))
+  .select(['B2','B4','B5','B6','B7','B8','B11','B12'])
+  .median()
+  .clip(allRegions);
+
+var ndvi = s2.normalizedDifference(['B8','B4'])
+               .rename('NDVI').toFloat();
+
+var evi  = s2.expression(
+    '2.5 * ((NIR - RED) / (NIR + 6*RED - 7.5*BLUE + 1))',
+    {
+      'NIR' : s2.select('B8'),
+      'RED' : s2.select('B4'),
+      'BLUE': s2.select('B2')
+    }
+).rename('EVI').toFloat();
+
+// === STEP 3: Mask non‐cropland (Dynamic World) ===
+var dw = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
+  .filterDate('2024-01-01','2024-12-31')
+  .select('label')
+  .median()
+  .clip(allRegions);
+
+var cropland   = dw.eq(3);
+var water      = dw.eq(0);
+var builtUp    = dw.eq(2);
+var landMask   = cropland.and(water.or(builtUp).not());
+
+var ndviMask   = ndvi.updateMask(landMask);
+var eviMask    = evi .updateMask(landMask);
+
+// === STEP 4: Slope filtering (SRTM) ===
+var dem   = ee.Image('USGS/SRTMGL1_003');
+var slope = ee.Terrain.slope(dem)
+               .rename('Slope')
+               .toFloat();
+var flat  = slope.lt(15);
+
+var ndviFlat = ndviMask.updateMask(flat);
+var eviFlat  = eviMask .updateMask(flat);
+
+// === STEP 5: GLCM entropy texture filter ===
+var ndviByte = ndviFlat.multiply(255).toByte();
+var glcm     = ndviByte.glcmTexture({size: 3});
+// GLCM entropy band is named 'NDVI_ent'
+var entropy  = glcm.select('NDVI_ent')
+               .rename('Entropy')
+               .toFloat();
+var textureMask = entropy.gt(2);
+
+var ndviText = ndviFlat.updateMask(textureMask);
+var eviText  = eviFlat .updateMask(textureMask);
+
+// === STEP 6: Monthly NDVI composites (fixed!!) ===
+var months = ee.List.sequence(1,12);
+var monthlyImages = months.map(function(m) {
+  m = ee.Number(m).toInt();
+  var start = ee.Date.fromYMD(2024, m, 1);
+  var end   = start.advance(1, 'month');
+  // SELECT ONLY B4 & B8 before median
+  var mon = ee.ImageCollection('COPERNICUS/S2_SR')
+    .filterDate(start, end)
+    .filterBounds(allRegions)
+    .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 30))
+    .select(['B4','B8'])
+    .median()
+    .normalizedDifference(['B8','B4'])
+    .rename(ee.String('NDVI_').cat(m.format()))
+    .toFloat();
+  return mon;
+});
+var monthlyStack = ee.ImageCollection.fromImages(monthlyImages).toBands();
+
+// === STEP 7: Combine into one Float32 multiband image ===
+var combined = ndviText
+  .addBands(eviText)
+  .addBands(entropy)
+  .addBands(slope)
+  .addBands(monthlyStack)
+  .toFloat();
+
+// === STEP 8: Export each region ===
+var regionsList = allRegions.toList(allRegions.size());
+print('Total regions:', regionsList.size());
+
+regionsList.getInfo().forEach(function(elem, i) {
+  var region = ee.Feature(regionsList.get(i));
+  Export.image.toDrive({
+    image:            combined.clip(region.geometry()),
+    description:      'SugarcaneDetection_Region_' + i,
+    folder:           'GEE_Sugarcane_Exports',
+    fileNamePrefix:   'Region_' + i,
+    region:           region.geometry(),
+    scale:            30,
+    maxPixels:        1e13
+  });
+});
+print('All export tasks submitted.');
