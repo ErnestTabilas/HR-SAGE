@@ -30,15 +30,6 @@ const getColor = (stage) => {
   }
 };
 
-const getTextForPopup = (stage) => {
-  const harvestReady =
-    stage === "Ripening" ? "✔️ Ready for Harvest" : "⏳ Not Ready";
-  return `<div style="text-align:center;">
-    <strong style="color:${getColor(stage)};">${stage}</strong><br/>
-    ${harvestReady}
-  </div>`;
-};
-
 const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const stageInfo = [
@@ -110,7 +101,7 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
         </h4>
         <p className="text-sm text-gray-600 leading-relaxed">
           This map visualizes sugarcane farm growth stages using NDVI. Hex bins
-          group nearby data to improve performance and readability. Click on a
+          group nearby data to improve performance and readability. Hover over a
           hexagon to view its growth stage and harvest readiness.
         </p>
       </div>
@@ -131,31 +122,41 @@ const MapBoundsAdjuster = () => {
 
 const HexbinLayer = ({ data, selectedStages }) => {
   const map = useMap();
-  const popupRef = useRef(null);
+  const svgRef = useRef(null);
 
-  useEffect(() => {
+  const drawHexbins = () => {
     if (!map) return;
+
     const container = d3.select(map.getPanes().overlayPane);
     container.selectAll("svg").remove();
 
-    const svg = container.append("svg");
+    const svg = container.append("svg").attr("class", "leaflet-hexbin-svg");
+    svgRef.current = svg;
     const g = svg.append("g").attr("class", "leaflet-zoom-hide");
 
-    const width = map.getSize().x;
-    const height = map.getSize().y;
-    svg.attr("width", width).attr("height", height);
-
-    const hexRadius = 12;
     const hexbin = d3Hexbin()
-      .radius(hexRadius)
+      .radius(12)
       .x((d) => d[0])
       .y((d) => d[1]);
 
     const filtered = data.filter((d) => selectedStages[d.stage]);
+
     const hexPoints = filtered.map((d) => {
       const point = map.latLngToLayerPoint([d.lat, d.lng]);
       return [point.x, point.y, d.stage, d.lat, d.lng];
     });
+
+    const bounds = map.getBounds();
+    const topLeft = map.latLngToLayerPoint(bounds.getNorthWest());
+    const bottomRight = map.latLngToLayerPoint(bounds.getSouthEast());
+
+    svg
+      .attr("width", bottomRight.x - topLeft.x)
+      .attr("height", bottomRight.y - topLeft.y)
+      .style("left", `${topLeft.x}px`)
+      .style("top", `${topLeft.y}px`);
+
+    g.attr("transform", `translate(${-topLeft.x},${-topLeft.y})`);
 
     const bins = hexbin(hexPoints);
 
@@ -163,34 +164,43 @@ const HexbinLayer = ({ data, selectedStages }) => {
       .data(bins)
       .enter()
       .append("path")
-      .attr("d", () => hexbin.hexagon())
+      .attr("class", "hexagon")
+      .attr("d", hexbin.hexagon())
       .attr("transform", (d) => `translate(${d.x},${d.y})`)
       .attr("fill", (d) => getColor(d[0][2]))
       .attr("fill-opacity", 0.5)
       .attr("stroke", "#222")
       .attr("stroke-width", 0.5)
-      .on("click", function (event, d) {
+      .on("mouseover", function (event, d) {
         const stage = d[0][2];
         const lat = d[0][3];
         const lng = d[0][4];
-        const popup = L.popup()
+        const count = d.length;
+        const html = `
+          <div style="text-align:center;">
+            <strong style="color:${getColor(stage)};">${stage}</strong><br/>
+            ${
+              stage === "Ripening" ? "✔️ Ready for Harvest" : "⏳ Not Ready"
+            }<br/>
+            <span style="font-size:0.85em;">${count} crops in this area</span>
+          </div>`;
+
+        L.popup({ offset: L.point(0, -10) })
           .setLatLng([lat, lng])
-          .setContent(getTextForPopup(stage))
+          .setContent(html)
           .openOn(map);
-        popupRef.current = popup;
+      })
+      .on("mouseout", () => {
+        map.closePopup();
       });
+  };
 
-    const redraw = () => {
-      container.selectAll("svg").remove();
-      draw();
+  useEffect(() => {
+    drawHexbins();
+    map.on("moveend zoomend", drawHexbins);
+    return () => {
+      map.off("moveend zoomend", drawHexbins);
     };
-
-    const draw = () => {
-      svg.attr("width", map.getSize().x).attr("height", map.getSize().y);
-    };
-
-    map.on("zoomend moveend", redraw);
-    return () => map.off("zoomend moveend", redraw);
   }, [map, data, selectedStages]);
 
   return null;
@@ -201,7 +211,7 @@ const CheckHarvest = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMessage, setLoadingMessage] = useState("Initializing map...");
   const loadingMessages = [
-    "💡 Tip: Click on hexagons to see sugarcane growth stage.",
+    "💡 Tip: Hover over hexagons to see sugarcane growth stage.",
     "🧭 Tip: Use the search bar to zoom to a location.",
     "🌱 Germination (NDVI 0.1 - 0.2): Very early stage of sugarcane growth.",
     "🌾 Ripening (NDVI 0.3 - 0.5): Sugarcane may be ready for harvest.",
