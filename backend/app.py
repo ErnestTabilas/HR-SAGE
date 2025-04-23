@@ -4,7 +4,7 @@ import json
 import time
 import csv
 import logging
-import numpy as np 
+import numpy as np
 from flask import Flask, jsonify
 from flask_cors import CORS
 from googleapiclient.discovery import build
@@ -20,7 +20,7 @@ CORS(app)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-DRIVE_FOLDER_ID = "1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK"  # your Drive folder
+DRIVE_FOLDER_ID = "1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK"
 
 credentials = service_account.Credentials.from_service_account_file(
     SERVICE_ACCOUNT_FILE, scopes=SCOPES
@@ -29,7 +29,6 @@ drive_service = build("drive", "v3", credentials=credentials)
 
 # ---- Classification Logic ----
 def classify_growth_stage(ndvi, evi):
-    """Return (stage_name, color) given NDVI & EVI."""
     if ndvi >= 0.5 and evi >= 0.45:
         return "Grand Growth", "yellow"
     if ndvi >= 0.3 and evi >= 0.3:
@@ -42,7 +41,6 @@ def classify_growth_stage(ndvi, evi):
 
 # ---- Drive Helpers ----
 def list_csv_file_ids():
-    """List all CSV files in the designated Drive folder."""
     try:
         resp = drive_service.files().list(
             q=f"'{DRIVE_FOLDER_ID}' in parents and mimeType='text/csv'",
@@ -57,7 +55,6 @@ def list_csv_file_ids():
         return []
 
 def download_file_to_memory(file_id):
-    """Download a Drive file to a BytesIO, with simple retry logic."""
     try:
         request = drive_service.files().get_media(fileId=file_id)
     except Exception as e:
@@ -85,24 +82,17 @@ def download_file_to_memory(file_id):
 # ---- API Endpoint ----
 @app.route("/sugarcane-locations", methods=["GET"])
 def sugarcane_locations():
-    """
-    Reads all exported CSVs from Drive, extracts NDVI_max, NBSI, growthStage & coordinates,
-    and returns sugarcane locations with growth stage and summary counts.
-    """
     csv_ids = list_csv_file_ids()
     if not csv_ids:
         return jsonify({"error": "No CSV exports found in Drive."}), 500
 
-    # Map numeric stages to labels and colors
-    stage_map = {
-        "1": ("Germination", "red"),
-        "2": ("Tillering", "orange"),
-        "3": ("Grand Growth", "yellow"),
-        "4": ("Ripening", "green")
-    }
-
     points = []
-    summary = {v[0]: 0 for v in stage_map.values()}
+    summary = {
+        "Germination": 0,
+        "Tillering": 0,
+        "Grand Growth": 0,
+        "Ripening": 0
+    }
 
     for fid in csv_ids:
         bio = download_file_to_memory(fid)
@@ -114,21 +104,33 @@ def sugarcane_locations():
 
         for row in reader:
             try:
-                stage_raw = row.get("growthStage")
-                if stage_raw not in stage_map:
-                    continue  # skip stage 0 (no sugarcane) or invalid
+                geo = json.loads(row[".geo"])
+                lon, lat = geo["coordinates"]
 
-                geom = json.loads(row[".geo"])
-                lon, lat = geom["coordinates"]
-                stage_label, color = stage_map[stage_raw]
+                ndvi = float(row.get("NDVI", 0))
+                evi = float(row.get("EVI", 0)) if "EVI" in row else ndvi  # fallback if EVI missing
+                stage = row.get("growth_stage", "").strip()
+
+                if not stage or stage == "No Sugarcane":
+                    stage, color = classify_growth_stage(ndvi, evi)
+                    if stage == "No Sugarcane":
+                        continue
+                else:
+                    color_map = {
+                        "Germination": "red",
+                        "Tillering": "orange",
+                        "Grand Growth": "yellow",
+                        "Ripening": "green"
+                    }
+                    color = color_map.get(stage, "gray")
 
                 points.append({
                     "lat": lat,
                     "lng": lon,
-                    "stage": stage_label,
+                    "stage": stage,
                     "color": color
                 })
-                summary[stage_label] += 1
+                summary[stage] += 1
 
             except Exception as e:
                 logging.warning(f"Error parsing row: {e}")
