@@ -27,15 +27,16 @@ credentials = service_account.Credentials.from_service_account_file(
 )
 drive_service = build("drive", "v3", credentials=credentials)
 
-# ---- Classification Logic ----
-def classify_growth_stage(ndvi, evi):
-    if ndvi >= 0.5 and evi >= 0.45:
+# ---- Classification Logic (NDVI only) ----
+def classify_growth_stage(ndvi):
+    """Return (stage_name, color) based on NDVI thresholds only."""
+    if ndvi >= 0.5:
         return "Grand Growth", "yellow"
-    if ndvi >= 0.3 and evi >= 0.3:
+    if ndvi >= 0.3:
         return "Ripening", "green"
-    if ndvi >= 0.2 and evi >= 0.2:
+    if ndvi >= 0.2:
         return "Tillering", "orange"
-    if ndvi >= 0.1 and evi >= 0.1:
+    if ndvi >= 0.1:
         return "Germination", "red"
     return "No Sugarcane", "gray"
 
@@ -87,12 +88,7 @@ def sugarcane_locations():
         return jsonify({"error": "No CSV exports found in Drive."}), 500
 
     points = []
-    summary = {
-        "Germination": 0,
-        "Tillering": 0,
-        "Grand Growth": 0,
-        "Ripening": 0
-    }
+    summary = {"Germination": 0, "Tillering": 0, "Grand Growth": 0, "Ripening": 0}
 
     for fid in csv_ids:
         bio = download_file_to_memory(fid)
@@ -104,32 +100,19 @@ def sugarcane_locations():
 
         for row in reader:
             try:
+                # parse geometry
                 geo = json.loads(row[".geo"])
                 lon, lat = geo["coordinates"]
 
+                # parse NDVI
                 ndvi = float(row.get("NDVI", 0))
-                evi = float(row.get("EVI", 0)) if "EVI" in row else ndvi  # fallback if EVI missing
-                stage = row.get("growth_stage", "").strip()
 
-                if not stage or stage == "No Sugarcane":
-                    stage, color = classify_growth_stage(ndvi, evi)
-                    if stage == "No Sugarcane":
-                        continue
-                else:
-                    color_map = {
-                        "Germination": "red",
-                        "Tillering": "orange",
-                        "Grand Growth": "yellow",
-                        "Ripening": "green"
-                    }
-                    color = color_map.get(stage, "gray")
+                # classify based on NDVI only
+                stage, color = classify_growth_stage(ndvi)
+                if stage == "No Sugarcane":
+                    continue
 
-                points.append({
-                    "lat": lat,
-                    "lng": lon,
-                    "stage": stage,
-                    "color": color
-                })
+                points.append({"lat": lat, "lng": lon, "stage": stage, "color": color})
                 summary[stage] += 1
 
             except Exception as e:
@@ -137,10 +120,7 @@ def sugarcane_locations():
                 continue
 
     logging.info(f"Returning {len(points)} sugarcane points.")
-    return jsonify({
-        "points": points,
-        "summary": summary
-    })
+    return jsonify({"points": points, "summary": summary})
 
 if __name__ == "__main__":
     app.run(debug=True)
