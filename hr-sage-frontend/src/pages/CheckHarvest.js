@@ -106,7 +106,7 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   );
 };
 
-// Force initial fit to PH bounds
+// Force initial fit to the PH bounds
 const MapBoundsAdjuster = () => {
   const map = useMap();
   useEffect(() => {
