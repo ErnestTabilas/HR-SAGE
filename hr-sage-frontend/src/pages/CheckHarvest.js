@@ -125,8 +125,7 @@ const PixelLayer = ({ data = [], selectedStages }) => {
   const circleRefs = useRef([]);
 
   const getRadius = (zoom) => {
-    // Tweak this formula if needed
-    return Math.max(1.5, (zoom - 5) * 1.2);
+    return Math.max(1.0, (zoom - 5) * 1.2);
   };
 
   useEffect(() => {
@@ -141,6 +140,20 @@ const PixelLayer = ({ data = [], selectedStages }) => {
     const filtered = data.filter((d) => selectedStages[d.growth_stage]);
 
     filtered.forEach((d) => {
+      const popupContent = `
+        <div style="text-align: center;">
+          <strong style="color: ${getColor(d.growth_stage)};">
+            ${d.growth_stage}
+          </strong>
+          <br/>
+          ${
+            d.growth_stage === "Ripening"
+              ? "✔️ Ready for Harvest"
+              : "⏳ Not Ready Yet"
+          }
+        </div>
+      `;
+
       const circle = L.circleMarker([d.lat, d.lng], {
         radius: getRadius(map.getZoom()),
         color: getColor(d.growth_stage),
@@ -148,19 +161,7 @@ const PixelLayer = ({ data = [], selectedStages }) => {
         fillOpacity: 0.7,
         weight: 0,
         ...canvasOptions,
-      });
-
-      circle.bindPopup(
-        <div style="text-align:center;">
-          <strong style="color:${getColor(d.growth_stage)}">
-            ${d.growth_stage}
-          </strong>
-          <br />$
-          {d.growth_stage === "Ripening"
-            ? "✔️ Ready for Harvest"
-            : "⏳ Not Ready"}
-        </div>
-      );
+      }).bindPopup(popupContent);
 
       layerGroup.addLayer(circle);
       circleRefs.current.push(circle);
@@ -170,22 +171,21 @@ const PixelLayer = ({ data = [], selectedStages }) => {
       const zoom = map.getZoom();
       const targetRadius = getRadius(zoom);
 
-      // Smoothly animate the transition
       circleRefs.current.forEach((circle) => {
         const currentRadius = circle.getRadius();
         const delta = targetRadius - currentRadius;
 
         if (Math.abs(delta) > 0.1) {
-          circle.setRadius(currentRadius + delta * 0.2); // smooth approach
+          circle.setRadius(currentRadius + delta * 0.2);
         } else {
           circle.setRadius(targetRadius);
         }
       });
 
-      requestAnimationFrame(updateCircleSizes); // keep updating smoothly
+      requestAnimationFrame(updateCircleSizes);
     };
 
-    updateCircleSizes(); // start animation loop
+    updateCircleSizes();
 
     return () => {
       layerGroup.clearLayers();
