@@ -41,29 +41,29 @@ def list_csv_file_ids():
         return []
 
 def download_file_to_memory(file_id):
-    try:
-        request = drive_service.files().get_media(fileId=file_id)
-    except Exception as e:
-        logging.error(f"Could not init download request for {file_id}: {e}")
-        return None
-
-    fh = io.BytesIO()
-    downloader = MediaIoBaseDownload(fh, request)
     retries = 3
-    done = False
-    while not done and retries:
+    for attempt in range(retries):
         try:
+            request = drive_service.files().get_media(fileId=file_id)
+            fh = io.BytesIO()
+            downloader = MediaIoBaseDownload(fh, request)
+
+            done = False
             while not done:
                 status, done = downloader.next_chunk()
-                logging.debug(f"Downloading {file_id}: {int(status.progress()*100)}%")
+                if status:
+                    logging.debug(f"Downloading {file_id}: {int(status.progress() * 100)}%")
+
             fh.seek(0)
-            return fh
+            return fh  # success!
+
         except Exception as e:
-            retries -= 1
-            logging.warning(f"Download error for {file_id}: {e} - retrying ({retries} left)")
+            logging.warning(f"Download error for {file_id}: {e} - retrying ({retries - attempt - 1} left)")
             time.sleep(2)
-    logging.error(f"Failed to download {file_id}")
+    
+    logging.error(f"Failed to download {file_id} after {retries} retries.")
     return None
+
 
 # ---- API Endpoint ----
 @app.route("/sugarcane-locations", methods=["GET"])
@@ -84,10 +84,15 @@ def sugarcane_locations():
 
         for row in reader:
             try:
+                if not row["lat"] or not row["lng"]:
+                    continue  # Skip rows missing lat/lng
+
                 lat = float(row["lat"])
                 lng = float(row["lng"])
-                n_tallmonths = int(row["n_tallmonths"])
-                growth_stage = row["growth_stage"]
+
+                # Handle optional fields more safely
+                n_tallmonths = int(row["n_tallmonths"]) if row.get("n_tallmonths") and row["n_tallmonths"].isdigit() else 0
+                growth_stage = row.get("growth_stage", "Unknown")
 
                 points.append({
                     "lat": lat,

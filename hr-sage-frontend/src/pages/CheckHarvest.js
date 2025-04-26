@@ -1,14 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  useMap,
-  Popup,
-  useMapEvents,
-} from "react-leaflet";
+import { MapContainer, TileLayer, useMap, Popup } from "react-leaflet";
 import L from "leaflet";
-import * as d3 from "d3";
-import { hexbin as d3Hexbin } from "d3-hexbin";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
 import "leaflet/dist/leaflet.css";
@@ -104,9 +96,10 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
           About this Map
         </h4>
         <p className="text-sm text-gray-600 leading-relaxed">
-          This map visualizes sugarcane growth stages via NDVI/EVI hex‑bins.
+          This map visualizes sugarcane growth stages via NDVI/EVI pixel
+          overlays.
           <br />
-          Hover over a hexagon to see its stage, readiness, and count.
+          Hover over a pixel to see its stage and readiness.
         </p>
       </div>
     </div>
@@ -125,102 +118,53 @@ const MapBoundsAdjuster = () => {
   return null;
 };
 
-// Draw and update hex‑bins on the Leaflet overlay pane
-const HexbinLayer = ({ data = [], selectedStages }) => {
+// Draw actual pixels as circles
+const PixelLayer = ({ data = [], selectedStages }) => {
   const map = useMap();
-  const svgRef = useRef(null);
-
-  const drawHexbins = () => {
-    if (!map) return;
-
-    // Clear old
-    const pane = map.getPanes().overlayPane;
-    d3.select(pane).selectAll("svg").remove();
-
-    // Create new svg
-    const svg = d3
-      .select(pane)
-      .append("svg")
-      .attr("class", "leaflet-hexbin-svg");
-    svgRef.current = svg;
-
-    const g = svg.append("g").attr("class", "leaflet-zoom-hide");
-
-    // Project filtered points
-    const filtered = data.filter((d) => selectedStages[d.growth_stage]);
-    const points = filtered.map((d) => {
-      const pt = map.latLngToLayerPoint([d.lat, d.lng]);
-      return [pt.x, pt.y, d.growth_stage, d.lat, d.lng]; // <-- CORRECT
-    });
-
-    // Compute tile origin & size
-    const bounds = map.getBounds();
-    const topLeft = map.latLngToLayerPoint(bounds.getNorthWest());
-    const botRight = map.latLngToLayerPoint(bounds.getSouthEast());
-
-    svg
-      .attr("width", botRight.x - topLeft.x)
-      .attr("height", botRight.y - topLeft.y)
-      .style("left", `${topLeft.x}px`)
-      .style("top", `${topLeft.y}px`);
-
-    g.attr("transform", `translate(${-topLeft.x},${-topLeft.y})`);
-
-    // Hexbin layout
-    const hexbin = d3Hexbin()
-      .radius(12)
-      .x((d) => d[0])
-      .y((d) => d[1]);
-    const bins = hexbin(points);
-
-    g.selectAll(".hexagon")
-      .data(bins)
-      .enter()
-      .append("path")
-      .attr("class", "hexagon")
-      .attr("d", hexbin.hexagon())
-      .attr("transform", (d) => `translate(${d.x},${d.y})`)
-      .attr("fill", (d) => getColor(d[0][2]))
-      .attr("fill-opacity", 0.5)
-      .attr("stroke", "#222")
-      .attr("stroke-width", 0.5)
-      .on("mouseover", (event, d) => {
-        const stage = d[0][2];
-        const lat = d[0][3];
-        const lng = d[0][4];
-        const count = d.length;
-        const html = `
-          <div style="text-align:center;">
-            <strong style="color:${getColor(stage)}">${stage}</strong><br/>
-            ${
-              stage === "Ripening" ? "✔️ Ready for Harvest" : "⏳ Not Ready"
-            }<br/>
-            <small>${count} points</small>
-          </div>`;
-        L.popup({ offset: L.point(0, -10) })
-          .setLatLng([lat, lng])
-          .setContent(html)
-          .openOn(map);
-      })
-      .on("mouseout", () => {
-        map.closePopup();
-      });
-  };
+  const layerGroupRef = useRef(L.layerGroup().addTo(map));
 
   useEffect(() => {
-    drawHexbins();
-    map.on("moveend zoomend", drawHexbins);
+    const layerGroup = layerGroupRef.current;
+    layerGroup.clearLayers();
+
+    const filtered = data.filter((d) => selectedStages[d.growth_stage]);
+
+    filtered.forEach((d) => {
+      const circle = L.circleMarker([d.lat, d.lng], {
+        radius: 2.5,
+        color: getColor(d.growth_stage),
+        fillColor: getColor(d.growth_stage),
+        fillOpacity: 0.7,
+        weight: 0,
+      });
+
+      circle.bindPopup(`
+        <div style="text-align:center;">
+          <strong style="color:${getColor(d.growth_stage)}">${
+        d.growth_stage
+      }</strong><br/>
+          ${
+            d.growth_stage === "Ripening"
+              ? "✔️ Ready for Harvest"
+              : "⏳ Not Ready"
+          }
+        </div>
+      `);
+
+      layerGroup.addLayer(circle);
+    });
+
     return () => {
-      map.off("moveend zoomend", drawHexbins);
+      layerGroup.clearLayers();
     };
-  }, [map, data, selectedStages]);
+  }, [data, selectedStages, map]);
 
   return null;
 };
 
 // Main component
 const CheckHarvest = () => {
-  const [locations, setLocations] = useState([]); // Array of points
+  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMsg, setLoadingMsg] = useState("Initializing map...");
   const [selectedStages, setSelectedStages] = useState({
@@ -232,7 +176,7 @@ const CheckHarvest = () => {
   const mapRef = useRef();
 
   const loadingTips = [
-    "💡 Tip: Hover over hexagons to see details.",
+    "💡 Tip: Hover over pixels to see details.",
     "🧭 Tip: Use the search bar to zoom.",
     "🔍 Tip: Toggle stages in the legend.",
     "🌱 Germination (NDVI 0.1–0.2): Early growth.",
@@ -240,7 +184,6 @@ const CheckHarvest = () => {
     "🗓️ Data updates every 5 days.",
   ];
 
-  // Rotate loading messages
   useEffect(() => {
     let idx = 0;
     const iv = setInterval(() => {
@@ -250,12 +193,10 @@ const CheckHarvest = () => {
     return () => clearInterval(iv);
   }, []);
 
-  // Fetch from backend
   useEffect(() => {
     axios
       .get("http://127.0.0.1:5000/sugarcane-locations")
       .then((res) => {
-        // <-- FIX: res.data.points is the array
         setLocations(Array.isArray(res.data.points) ? res.data.points : []);
         setLoading(false);
       })
@@ -327,7 +268,7 @@ const CheckHarvest = () => {
           >
             <MapBoundsAdjuster />
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <HexbinLayer data={locations} selectedStages={selectedStages} />
+            <PixelLayer data={locations} selectedStages={selectedStages} />
           </MapContainer>
         )}
       </div>

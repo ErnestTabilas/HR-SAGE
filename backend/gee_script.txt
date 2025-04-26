@@ -1,68 +1,198 @@
-// Define bounding boxes for specific sugarcane regions in Luzon, Visayas, and Mindanao
+// =========================================================
+// Load GEDI-Sentinel sugarcane tiles
+// =========================================================
+var collection = ee.ImageCollection('projects/lobell-lab/gedi_sugarcane/maps/imgColl_10m_ESAESRIGLAD');
+var phTiles = collection.filter(ee.Filter.eq('country', 'philippines'));
 
-var luzon = ee.FeatureCollection([
-  ee.Feature(ee.Geometry.Rectangle([121.25, 15.5, 122.5, 16.5])), // Isabela
-  ee.Feature(ee.Geometry.Rectangle([120.5, 14.5, 121.5, 15.5])), // Tarlac
-  ee.Feature(ee.Geometry.Rectangle([120.5, 13.0, 121.0, 14.0])), // Pangasinan
-  ee.Feature(ee.Geometry.Rectangle([121.0, 13.5, 122.0, 14.5])), // Batangas
-  ee.Feature(ee.Geometry.Rectangle([121.75, 15.5, 122.25, 16.5]))  // Negros Occidental
-]);
-
-var visayas = ee.FeatureCollection([
-  ee.Feature(ee.Geometry.Rectangle([122.5, 9.5, 123.5, 10.5])), // Iloilo
-  ee.Feature(ee.Geometry.Rectangle([124.0, 9.0, 125.0, 10.0])), // Leyte
-  ee.Feature(ee.Geometry.Rectangle([122.5, 10.0, 123.5, 11.0])), // Bohol
-  ee.Feature(ee.Geometry.Rectangle([122.25, 10.5, 123.0, 11.5])), // Antique
-  ee.Feature(ee.Geometry.Rectangle([122.75, 10.5, 123.5, 11.5]))  // Negros Occidental
-]);
-
-var mindanao = ee.FeatureCollection([
-  ee.Feature(ee.Geometry.Rectangle([125.0, 6.5, 126.0, 7.5])), // Davao del Sur
-  ee.Feature(ee.Geometry.Rectangle([124.5, 7.5, 125.5, 8.5])), // Bukidnon
-  ee.Feature(ee.Geometry.Rectangle([124.0, 6.5, 125.0, 7.5])), // North Cotabato
-  ee.Feature(ee.Geometry.Rectangle([122.75, 7.0, 123.75, 8.0])), // Zamboanga del Sur
-  ee.Feature(ee.Geometry.Rectangle([124.0, 6.0, 125.0, 7.0]))  // Sultan Kudarat
-]);
-
-// Combine all regions into one feature collection
-var allRegions = luzon.merge(visayas).merge(mindanao);
-
-// Load Sentinel-2 imagery and filter for the regions
-var image = ee.ImageCollection('COPERNICUS/S2_SR')
-  .filterBounds(allRegions)
-  .filterDate('2024-01-01', '2024-12-31')
-  .select(['B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B11', 'B12'])
-  .map(function(image) {
-    return image.clip(allRegions);
-  })
-  .median();
-
-// Compute NDVI
-var ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI');
-
-// Load land cover data to mask out non-cropland areas
-var landcover = ee.ImageCollection("GOOGLE/DYNAMICWORLD/V1")
-  .filterDate('2024-01-01', '2024-12-31')
-  .select('label')
-  .map(function(image) {
-    return image.clip(allRegions);
-  })
-  .median();
-
-var croplandMask = landcover.eq(3);  // Cropland is label 3 in Dynamic World
-var ndviMasked = ndvi.updateMask(croplandMask);
-
-// Loop through each region in the collection and export the NDVI data
-allRegions.evaluate(function(regions) {
-  for (var i = 0; i < regions.features.length; i++) {
-    var region = ee.Feature(regions.features[i]);
-    Export.image.toDrive({
-      image: ndviMasked.clip(region.geometry()),
-      description: 'NDVI_Region_' + i,
-      scale: 30,
-      region: region.geometry(),
-      maxPixels: 1e13
-    });
-    print('Export task initiated for Region ' + i);
-  }
+// =========================================================
+// Apply sugarcane mask from ESSD (ESA, ESRI, GLAD)
+// =========================================================
+var cropMasks = phTiles.map(function(image) {
+  var esa = image.select('ESA').eq(1).unmask(0);
+  var esri = image.select('ESRI').eq(1).unmask(0);
+  var glad = image.select('GLAD').eq(1).unmask(0);
+  var combinedMask = esa.or(esri).or(glad);
+  
+  var sugarcane = image.select('sugarcane').eq(1).updateMask(combinedMask);
+  
+  return image.addBands(sugarcane.rename('sugarcane_mask'));
 });
+
+// =========================================================
+// Filter tiles that have at least some sugarcane
+// =========================================================
+var filteredTiles = cropMasks.filter(ee.Filter.gt('sugarcane_mask', 0));  // Corrected filter for sugarcane presence
+
+// Check number of filtered tiles
+print('Filtered tiles count:', filteredTiles.size());
+
+// If there are no filtered tiles, print and do not continue
+if (filteredTiles.size().getInfo() === 0) {
+  print('No valid sugarcane tiles found.');
+} else {
+  // =========================================================
+  // Sentinel-2 composites (latest 3 months)
+  // =========================================================
+  var start = '2024-01-01';
+  var end = '2024-04-01';
+
+  var s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+    .filterBounds(phTiles.geometry())
+    .filterDate(start, end)
+    .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+    .map(function(img) {
+      var ndvi = img.normalizedDifference(['B8', 'B4']).rename('NDVI');
+      var evi = img.expression(
+        '2.5 * ((NIR - RED) / (NIR + 6 * RED - 7.5 * BLUE + 1))',
+        {
+          'NIR': img.select('B8'),
+          'RED': img.select('B4'),
+          'BLUE': img.select('B2')
+        }
+      ).rename('EVI');
+      return img.addBands(ndvi).addBands(evi);
+    });
+
+  // Median composites
+  var ndviComposite = s2.select('NDVI').median();
+  var eviComposite = s2.select('EVI').median();
+
+  // NDVI trend
+  var ndviTrend = s2.select('NDVI').reduce(ee.Reducer.linearFit()).select('scale').rename('NDVI_trend');
+
+  // NDVI entropy (texture)
+  var ndviEntropy = ndviComposite.glcmTexture({size: 3}).select('NDVI_entropy');
+
+  // Approximate month of observation
+  var month = ee.Date('2024-03-01').get('month');
+
+  // =========================================================
+  // Growth Stage Classifier (ESSD sugarcane ONLY)
+  // =========================================================
+  function classifyGrowthStage(nTall, ndvi, evi, ndviTrend, month, entropy) {
+    return ee.Algorithms.If(nTall, // If nTall exists
+      ee.Algorithms.If(entropy.gt(3.0), 'Noisy/Uncertain', // High texture means unreliable
+        ee.Algorithms.If(nTall.gte(10),
+          ee.Algorithms.If(ndvi.gte(0.65).and(evi.gte(0.6)).and(ndviTrend.lte(0)),
+            'Ripening',
+            'Grand Growth'
+          ),
+        ee.Algorithms.If(nTall.gte(6),
+          ee.Algorithms.If(ndvi.gte(0.5),
+            'Tillering',
+            'Germination'
+          ),
+        ee.Algorithms.If(nTall.gte(3),
+          ee.Algorithms.If(month.lte(3),
+            'Germination',
+            'Tillering'
+          ),
+        ee.Algorithms.If(nTall.gte(1),
+          'Germination',
+          'No Sugarcane'
+        ))))),
+      'Unknown'
+    );
+  }
+
+  // =========================================================
+  // Loop through each tile and export CSVs
+  // =========================================================
+  var list = filteredTiles.toList(filteredTiles.size());
+  var tileCount = list.size();
+  print('Number of tiles to export:', tileCount);
+
+  // If there are no tiles, exit early
+  if (tileCount.getInfo() === 0) {
+    print('No tiles to export.');
+  } else {
+    var exportEachTile = function(i) {
+      var img = ee.Image(list.get(i));
+
+      var sugarcaneMask = img.select('sugarcane_mask');
+
+      var vectors = sugarcaneMask.selfMask().reduceToVectors({
+        geometryType: 'centroid',
+        reducer: ee.Reducer.countEvery(),
+        scale: 10,
+        maxPixels: 1e9
+      });
+
+      vectors = vectors.map(function(f) {
+        var coords = f.geometry().coordinates();
+        var lat = coords.get(1);
+        var lon = coords.get(0);
+
+        var nTall = img.select('n_tallmonths').reduceRegion({
+          reducer: ee.Reducer.first(),
+          geometry: f.geometry(),
+          scale: 10,
+          bestEffort: true
+        }).get('n_tallmonths');
+
+        var ndvi = ndviComposite.reduceRegion({
+          reducer: ee.Reducer.first(),
+          geometry: f.geometry(),
+          scale: 10,
+          bestEffort: true
+        }).get('NDVI');
+
+        var evi = eviComposite.reduceRegion({
+          reducer: ee.Reducer.first(),
+          geometry: f.geometry(),
+          scale: 10,
+          bestEffort: true
+        }).get('EVI');
+
+        var ndvi_trend = ndviTrend.reduceRegion({
+          reducer: ee.Reducer.first(),
+          geometry: f.geometry(),
+          scale: 10,
+          bestEffort: true
+        }).get('NDVI_trend');
+
+        var entropy = ndviEntropy.reduceRegion({
+          reducer: ee.Reducer.first(),
+          geometry: f.geometry(),
+          scale: 10,
+          bestEffort: true
+        }).get('NDVI_entropy');
+
+        var stage = classifyGrowthStage(
+          ee.Number(nTall),
+          ee.Number(ndvi),
+          ee.Number(evi),
+          ee.Number(ndvi_trend),
+          ee.Number(month),
+          ee.Number(entropy)
+        );
+
+        return f.set({
+          'lat': lat,
+          'lng': lon,
+          'n_tallmonths': nTall,
+          'ndvi': ndvi,
+          'evi': evi,
+          'ndvi_trend': ndvi_trend,
+          'entropy': entropy,
+          'growth_stage': stage
+        });
+      });
+
+      // Adjusted naming: file will now be named as tile_1, tile_2, ...
+      Export.table.toDrive({
+        collection: vectors,
+        description: 'tile_' + (i + 1), // Corrected file name
+        fileFormat: 'CSV',
+        selectors: ['lat', 'lng', 'n_tallmonths', 'ndvi', 'evi', 'ndvi_trend', 'entropy', 'growth_stage']
+      });
+
+      return null;
+    };
+
+    // =========================================================
+    // Execute the export for all tiles
+    // =========================================================
+    ee.List.sequence(0, tileCount.subtract(1)).map(exportEachTile);
+  }
+}
