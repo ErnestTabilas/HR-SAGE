@@ -84,21 +84,10 @@ def sugarcane_locations():
 
         for row in reader:
             try:
-                # Basic validation
-                if not row.get("lat") or not row.get("lng"):
-                    continue
-
                 lat = float(row["lat"])
                 lng = float(row["lng"])
-
-                # Handle missing or invalid n_tallmonths safely
-                n_tallmonths_str = row.get("n_tallmonths", "").strip()
-                if n_tallmonths_str == "":
-                    n_tallmonths = None
-                else:
-                    n_tallmonths = int(float(n_tallmonths_str))
-
-                growth_stage = row.get("growth_stage", "Unknown")
+                n_tallmonths = int(row["n_tallmonths"])
+                growth_stage = row["growth_stage"]
 
                 points.append({
                     "lat": lat,
