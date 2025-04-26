@@ -234,6 +234,7 @@ const CheckHarvest = () => {
     "Grand Growth": true,
     Ripening: true,
   });
+  const [fetchingData, setFetchingData] = useState(false); // Flag to prevent re-fetching
   const mapRef = useRef();
 
   const loadingTips = [
@@ -255,77 +256,71 @@ const CheckHarvest = () => {
   }, []);
 
   useEffect(() => {
-    axios
-      .get("http://127.0.0.1:5000/sugarcane-locations")
-      .then((res) => {
-        const points = Array.isArray(res.data.points) ? res.data.points : [];
-        setLocations(points);
-        if (points.length > 0) {
-          setLoading(false);
-        } else {
-          setLoadingMsg("No sugarcane points found. Waiting for data...");
-        }
-      })
-      .catch((err) => {
-        console.error("Error loading data:", err);
-        setLoadingMsg("Failed to load data. Please try again later.");
-        setLoading(false);
-      });
-  }, []);
+    if (fetchingData) return; // Prevent re-executing if already fetching
 
-  const searchLocation = async (q) => {
-    try {
-      const r = await axios.get("https://nominatim.openstreetmap.org/search", {
-        params: { q, format: "json", countrycodes: "PH", limit: 1 },
-      });
-      if (r.data[0]) {
-        const { lat, lon } = r.data[0];
-        mapRef.current.setView([+lat, +lon], 15);
-      } else {
-        alert("Location not found.");
-      }
-    } catch (e) {
-      console.error(e);
-    }
-  };
+    const fetchLocations = () => {
+      setFetchingData(true); // Set flag to prevent re-fetching
 
-  const toggleStage = (stage) =>
-    setSelectedStages((prev) => ({ ...prev, [stage]: !prev[stage] }));
+      axios
+        .get("http://127.0.0.1:5000/sugarcane-locations")
+        .then((res) => {
+          const points = Array.isArray(res.data.points) ? res.data.points : [];
+          if (points.length > 0) {
+            setLocations(points);
+            setLoading(false); // Set loading to false when data is fetched
+          }
+        })
+        .catch((err) => {
+          console.error("Error fetching data:", err);
+        })
+        .finally(() => {
+          setFetchingData(false); // Reset the fetching flag after fetching
+        });
+    };
+
+    fetchLocations(); // Initial fetch
+    const intervalId = setInterval(fetchLocations, 5000); // Polling every 5 seconds
+
+    // Cleanup the polling interval when the component unmounts
+    return () => clearInterval(intervalId);
+  }, [fetchingData]); // Only trigger effect if not already fetching
 
   return (
-    <div className="flex h-screen">
-      <div className="bg-green-50 w-1/4 p-6 overflow-y-auto border-r">
+    <div className="w-full h-screen flex flex-row bg-gray-100">
+      <div className="w-full md:w-1/4 p-4 overflow-auto">
         <Legend
-          onSearch={searchLocation}
+          onSearch={(term) => console.log("Search term:", term)}
           selectedStages={selectedStages}
-          onToggleStage={toggleStage}
+          onToggleStage={(stage) =>
+            setSelectedStages((prev) => ({
+              ...prev,
+              [stage]: !prev[stage],
+            }))
+          }
         />
       </div>
 
-      <div className="w-3/4 relative z-0">
+      <div className="w-full md:w-3/4">
         {loading ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-80 z-10">
-            <FontAwesomeIcon
-              icon={faSpinner}
-              spin
-              className="text-emerald-600 text-4xl mb-3"
-            />
-            <p className="text-lg font-medium text-gray-600 text-center p-6">
-              {loadingMsg}
-            </p>
+          <div className="w-full h-full flex items-center justify-center bg-white">
+            <div>
+              <FontAwesomeIcon icon={faSpinner} className="animate-spin" />
+              <p>{loadingMsg}</p>
+            </div>
           </div>
         ) : (
           <MapContainer
             ref={mapRef}
-            style={{ height: "100vh", width: "100%" }}
+            className="w-full h-full"
+            center={[10.3, 122.9]}
             zoom={7}
-            minZoom={6}
-            maxZoom={24}
-            scrollWheelZoom
-            maxBoundsViscosity={1.0}
+            scrollWheelZoom={true}
           >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            />
             <MapBoundsAdjuster />
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <HexbinLayer data={locations} selectedStages={selectedStages} />
           </MapContainer>
         )}
