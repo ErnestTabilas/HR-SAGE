@@ -1,0 +1,82 @@
+// Load the full GEDI-Sentinel sugarcane dataset
+var collection = ee.ImageCollection('projects/lobell-lab/gedi_sugarcane/maps/imgColl_10m_ESAESRIGLAD');
+
+// Filter to all tiles in the Philippines
+var phTiles = collection.filter(ee.Filter.eq('country', 'philippines'));
+
+// Function to classify growth stage based on 'n_tallmonths'
+function classifyGrowthStage(nTall) {
+  return ee.Algorithms.If(nTall,
+    ee.Algorithms.If(nTall.gte(10), 'Grand Growth',
+    ee.Algorithms.If(nTall.gte(6), 'Ripening',
+    ee.Algorithms.If(nTall.gte(3), 'Tillering',
+    ee.Algorithms.If(nTall.gte(1), 'Germination', 'No Sugarcane')
+    ))),
+  'Unknown');
+}
+
+// For each tile image, process and export individually
+phTiles.evaluate(function(tilesList) {
+  tilesList.features.forEach(function(tileFeature, index) {
+    var tileNumber = index + 1; // Start from 1
+
+    var tileId = tileFeature.id;
+    var tileImage = ee.Image(tileId); // ← DIRECTLY load the tile
+
+    // Apply crop masks
+    var esa = tileImage.select('ESA').eq(1).unmask(0);
+    var esri = tileImage.select('ESRI').eq(1).unmask(0);
+    var glad = tileImage.select('GLAD').eq(1).unmask(0);
+    var combinedMask = esa.or(esri).or(glad);
+    var sugarcane = tileImage.select('sugarcane').eq(1).updateMask(combinedMask);
+    var maskedTile = tileImage.addBands(sugarcane.rename('sugarcane_mask'));
+
+    // Convert sugarcane pixels to points
+    var vectors = maskedTile.select('sugarcane_mask').selfMask().reduceToVectors({
+      geometryType: 'centroid',
+      reducer: ee.Reducer.countEvery(),
+      scale: 10,
+      maxPixels: 1e9
+    });
+
+    // Annotate features
+    var annotated = vectors.map(function(feature) {
+      var coords = feature.geometry().coordinates();
+      var lat = coords.get(1);
+      var lon = coords.get(0);
+
+      var nTall = maskedTile.select('n_tallmonths').reduceRegion({
+        reducer: ee.Reducer.first(),
+        geometry: feature.geometry(),
+        scale: 10,
+        bestEffort: true
+      }).get('n_tallmonths');
+
+      var stage = classifyGrowthStage(ee.Number(nTall));
+
+      return feature.set({
+        'lat': lat,
+        'lng': lon,
+        'n_tallmonths': nTall,
+        'growth_stage': stage
+      });
+    });
+
+    // Only export if annotated has features
+    annotated.size().evaluate(function(count) {
+      if (count > 0) {
+        print('Exporting tile ' + tileNumber + ' with ' + count + ' points.');
+        Export.table.toDrive({
+          collection: annotated,
+          description: 'Sugarcane_GrowthStage_tile_' + tileNumber,
+          fileNamePrefix: 'tile_' + tileNumber,
+          fileFormat: 'CSV',
+          selectors: ['lat', 'lng', 'n_tallmonths', 'growth_stage']
+        });
+      } else {
+        print('Skipping tile ' + tileNumber + ' (no sugarcane points detected).');
+      }
+    });
+
+  });
+});

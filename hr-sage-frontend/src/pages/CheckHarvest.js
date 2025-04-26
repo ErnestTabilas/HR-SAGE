@@ -118,7 +118,7 @@ const MapBoundsAdjuster = () => {
   return null;
 };
 
-// Draw actual pixels as circles
+// Draw actual pixels as circles (optimized)
 const PixelLayer = ({ data = [], selectedStages }) => {
   const map = useMap();
   const layerGroupRef = useRef(L.layerGroup().addTo(map));
@@ -127,15 +127,20 @@ const PixelLayer = ({ data = [], selectedStages }) => {
     const layerGroup = layerGroupRef.current;
     layerGroup.clearLayers();
 
+    const canvasOptions = {
+      renderer: L.canvas({ padding: 0.5 }), // Use canvas renderer
+    };
+
     const filtered = data.filter((d) => selectedStages[d.growth_stage]);
 
     filtered.forEach((d) => {
       const circle = L.circleMarker([d.lat, d.lng], {
-        radius: 2.5,
+        radius: 1.0, // Smaller pixel size
         color: getColor(d.growth_stage),
         fillColor: getColor(d.growth_stage),
         fillOpacity: 0.7,
         weight: 0,
+        ...canvasOptions,
       });
 
       circle.bindPopup(`
