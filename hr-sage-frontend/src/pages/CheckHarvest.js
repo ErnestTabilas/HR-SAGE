@@ -1,11 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  useMap,
-  Popup,
-  useMapEvents,
-} from "react-leaflet";
+import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import * as d3 from "d3";
 import { hexbin as d3Hexbin } from "d3-hexbin";
@@ -14,7 +8,7 @@ import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
-// Map NDVI stage to a hex color
+// Color for each stage
 const getColor = (stage) => {
   switch (stage) {
     case "Germination":
@@ -30,7 +24,7 @@ const getColor = (stage) => {
   }
 };
 
-// Legend component
+// Sidebar Legend
 const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const stageInfo = [
@@ -42,7 +36,6 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
 
   return (
     <div className="space-y-4 px-4">
-      {/* Search */}
       <div className="bg-white p-5 shadow-md rounded-lg">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           Search for a Place
@@ -64,7 +57,6 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
         </div>
       </div>
 
-      {/* Growth Stages */}
       <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           Sugarcane Growth Stages
@@ -80,10 +72,10 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
             {stageInfo.map((stage) => (
               <tr
                 key={stage.name}
-                className="cursor-pointer"
+                className="cursor-pointer hover:bg-gray-100"
                 onClick={() => onToggleStage(stage.name)}
               >
-                <td className="flex items-center space-x-2">
+                <td className="flex items-center space-x-2 py-2">
                   <span
                     className={`rounded-full w-5 h-5 ${
                       selectedStages[stage.name] ? stage.color : "bg-gray-300"
@@ -98,7 +90,6 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
         </table>
       </div>
 
-      {/* About */}
       <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           About this Map
@@ -106,14 +97,15 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
         <p className="text-sm text-gray-600 leading-relaxed">
           This map visualizes sugarcane growth stages via NDVI/EVI hex‑bins.
           <br />
-          Hover over a hexagon to see its stage, readiness, and count.
+          Hover over a hexagon to see its stage, harvest readiness, and number
+          of detected points.
         </p>
       </div>
     </div>
   );
 };
 
-// Force initial fit to PH bounds
+// Initial map bounds (Philippines)
 const MapBoundsAdjuster = () => {
   const map = useMap();
   useEffect(() => {
@@ -125,86 +117,99 @@ const MapBoundsAdjuster = () => {
   return null;
 };
 
-// Draw and update hex‑bins on the Leaflet overlay pane
+// Hexbin drawing with error tolerance
 const HexbinLayer = ({ data = [], selectedStages }) => {
   const map = useMap();
   const svgRef = useRef(null);
 
   const drawHexbins = () => {
-    if (!map) return;
+    try {
+      if (!map) return;
 
-    // Clear old
-    const pane = map.getPanes().overlayPane;
-    d3.select(pane).selectAll("svg").remove();
+      const pane = map.getPanes().overlayPane;
+      d3.select(pane).selectAll("svg").remove();
 
-    // Create new svg
-    const svg = d3
-      .select(pane)
-      .append("svg")
-      .attr("class", "leaflet-hexbin-svg");
-    svgRef.current = svg;
+      const svg = d3
+        .select(pane)
+        .append("svg")
+        .attr("class", "leaflet-hexbin-svg");
+      svgRef.current = svg;
 
-    const g = svg.append("g").attr("class", "leaflet-zoom-hide");
+      const g = svg.append("g").attr("class", "leaflet-zoom-hide");
 
-    // Project filtered points
-    const filtered = data.filter((d) => selectedStages[d.stage]);
-    const points = filtered.map((d) => {
-      const pt = map.latLngToLayerPoint([d.lat, d.lng]);
-      return [pt.x, pt.y, d.stage, d.lat, d.lng];
-    });
+      const bounds = map.getBounds();
+      const topLeft = map.latLngToLayerPoint(bounds.getNorthWest());
+      const botRight = map.latLngToLayerPoint(bounds.getSouthEast());
 
-    // Compute tile origin & size
-    const bounds = map.getBounds();
-    const topLeft = map.latLngToLayerPoint(bounds.getNorthWest());
-    const botRight = map.latLngToLayerPoint(bounds.getSouthEast());
+      svg
+        .attr("width", botRight.x - topLeft.x)
+        .attr("height", botRight.y - topLeft.y)
+        .style("left", `${topLeft.x}px`)
+        .style("top", `${topLeft.y}px`);
 
-    svg
-      .attr("width", botRight.x - topLeft.x)
-      .attr("height", botRight.y - topLeft.y)
-      .style("left", `${topLeft.x}px`)
-      .style("top", `${topLeft.y}px`);
+      g.attr("transform", `translate(${-topLeft.x},${-topLeft.y})`);
 
-    g.attr("transform", `translate(${-topLeft.x},${-topLeft.y})`);
-
-    // Hexbin layout
-    const hexbin = d3Hexbin()
-      .radius(12)
-      .x((d) => d[0])
-      .y((d) => d[1]);
-    const bins = hexbin(points);
-
-    g.selectAll(".hexagon")
-      .data(bins)
-      .enter()
-      .append("path")
-      .attr("class", "hexagon")
-      .attr("d", hexbin.hexagon())
-      .attr("transform", (d) => `translate(${d.x},${d.y})`)
-      .attr("fill", (d) => getColor(d[0][2]))
-      .attr("fill-opacity", 0.5)
-      .attr("stroke", "#222")
-      .attr("stroke-width", 0.5)
-      .on("mouseover", (event, d) => {
-        const stage = d[0][2];
-        const lat = d[0][3];
-        const lng = d[0][4];
-        const count = d.length;
-        const html = `
-          <div style="text-align:center;">
-            <strong style="color:${getColor(stage)}">${stage}</strong><br/>
-            ${
-              stage === "Ripening" ? "✔️ Ready for Harvest" : "⏳ Not Ready"
-            }<br/>
-            <small>${count} points</small>
-          </div>`;
-        L.popup({ offset: L.point(0, -10) })
-          .setLatLng([lat, lng])
-          .setContent(html)
-          .openOn(map);
-      })
-      .on("mouseout", () => {
-        map.closePopup();
+      // Filter and project valid points
+      const filtered = data.filter((d) => {
+        return (
+          d &&
+          typeof d.lat === "number" &&
+          typeof d.lng === "number" &&
+          !isNaN(d.lat) &&
+          !isNaN(d.lng) &&
+          d.stage &&
+          selectedStages[d.stage]
+        );
       });
+
+      const points = filtered.map((d) => {
+        const pt = map.latLngToLayerPoint([d.lat, d.lng]);
+        return [pt.x, pt.y, d.stage, d.lat, d.lng];
+      });
+
+      const hexbin = d3Hexbin()
+        .radius(12)
+        .x((d) => d[0])
+        .y((d) => d[1]);
+      const bins = hexbin(points);
+
+      g.selectAll(".hexagon")
+        .data(bins)
+        .enter()
+        .append("path")
+        .attr("class", "hexagon")
+        .attr("d", hexbin.hexagon())
+        .attr("transform", (d) => `translate(${d.x},${d.y})`)
+        .attr("fill", (d) => getColor(d[0][2]))
+        .attr("fill-opacity", 0.55)
+        .attr("stroke", "#333")
+        .attr("stroke-width", 0.6)
+        .on("mouseover", (event, d) => {
+          const stage = d[0][2];
+          const lat = d[0][3];
+          const lng = d[0][4];
+          const count = d.length;
+          const html = `
+            <div style="text-align:center; padding:4px;">
+              <div style="font-weight:bold; color:${getColor(
+                stage
+              )}">${stage}</div>
+              <div style="font-size:14px;">${
+                stage === "Ripening" ? "✔️ Ready for Harvest" : "⏳ Not Ready"
+              }</div>
+              <div style="font-size:12px; color:#555;">${count} points detected</div>
+            </div>`;
+          L.popup({ offset: L.point(0, -10) })
+            .setLatLng([lat, lng])
+            .setContent(html)
+            .openOn(map);
+        })
+        .on("mouseout", () => {
+          map.closePopup();
+        });
+    } catch (error) {
+      console.error("Error in drawing hexbins:", error);
+    }
   };
 
   useEffect(() => {
@@ -220,7 +225,7 @@ const HexbinLayer = ({ data = [], selectedStages }) => {
 
 // Main component
 const CheckHarvest = () => {
-  const [locations, setLocations] = useState([]); // Array of points
+  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingMsg, setLoadingMsg] = useState("Initializing map...");
   const [selectedStages, setSelectedStages] = useState({
@@ -240,7 +245,6 @@ const CheckHarvest = () => {
     "🗓️ Data updates every 5 days.",
   ];
 
-  // Rotate loading messages
   useEffect(() => {
     let idx = 0;
     const iv = setInterval(() => {
@@ -250,17 +254,21 @@ const CheckHarvest = () => {
     return () => clearInterval(iv);
   }, []);
 
-  // Fetch from backend
   useEffect(() => {
     axios
       .get("http://127.0.0.1:5000/sugarcane-locations")
       .then((res) => {
-        // <-- FIX: res.data.points is the array
-        setLocations(Array.isArray(res.data.points) ? res.data.points : []);
-        setLoading(false);
+        const points = Array.isArray(res.data.points) ? res.data.points : [];
+        setLocations(points);
+        if (points.length > 0) {
+          setLoading(false);
+        } else {
+          setLoadingMsg("No sugarcane points found. Waiting for data...");
+        }
       })
       .catch((err) => {
         console.error("Error loading data:", err);
+        setLoadingMsg("Failed to load data. Please try again later.");
         setLoading(false);
       });
   }, []);
@@ -284,14 +292,8 @@ const CheckHarvest = () => {
   const toggleStage = (stage) =>
     setSelectedStages((prev) => ({ ...prev, [stage]: !prev[stage] }));
 
-  const PH_BOUNDS = [
-    [4.5, 116.5],
-    [21.5, 126.5],
-  ];
-
   return (
     <div className="flex h-screen">
-      {/* Sidebar */}
       <div className="bg-green-50 w-1/4 p-6 overflow-y-auto border-r">
         <Legend
           onSearch={searchLocation}
@@ -300,7 +302,6 @@ const CheckHarvest = () => {
         />
       </div>
 
-      {/* Map */}
       <div className="w-3/4 relative z-0">
         {loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-80 z-10">
@@ -317,8 +318,6 @@ const CheckHarvest = () => {
           <MapContainer
             ref={mapRef}
             style={{ height: "100vh", width: "100%" }}
-            bounds={PH_BOUNDS}
-            maxBounds={PH_BOUNDS}
             zoom={7}
             minZoom={6}
             maxZoom={24}

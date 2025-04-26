@@ -1,17 +1,15 @@
 import os
 import io
-import json
-import time
 import csv
 import logging
-import numpy as np
+import time
 from flask import Flask, jsonify
 from flask_cors import CORS
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 from googleapiclient.http import MediaIoBaseDownload
 
-# ---- Setup ----
+# Setup logging and Flask app
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 CORS(app)
@@ -20,27 +18,14 @@ CORS(app)
 current_dir = os.path.dirname(os.path.abspath(__file__))
 SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-DRIVE_FOLDER_ID = "1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK"
+DRIVE_FOLDER_ID = "1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK"  # Your Google Drive folder ID
 
 credentials = service_account.Credentials.from_service_account_file(
     SERVICE_ACCOUNT_FILE, scopes=SCOPES
 )
 drive_service = build("drive", "v3", credentials=credentials)
 
-# ---- Classification Logic (NDVI only) ----
-def classify_growth_stage(ndvi):
-    """Return (stage_name, color) based on NDVI thresholds only."""
-    if ndvi >= 0.5:
-        return "Grand Growth", "yellow"
-    if ndvi >= 0.3:
-        return "Ripening", "green"
-    if ndvi >= 0.2:
-        return "Tillering", "orange"
-    if ndvi >= 0.1:
-        return "Germination", "red"
-    return "No Sugarcane", "gray"
-
-# ---- Drive Helpers ----
+# ---- Helpers to interact with Drive ----
 def list_csv_file_ids():
     try:
         resp = drive_service.files().list(
@@ -88,7 +73,6 @@ def sugarcane_locations():
         return jsonify({"error": "No CSV exports found in Drive."}), 500
 
     points = []
-    summary = {"Germination": 0, "Tillering": 0, "Grand Growth": 0, "Ripening": 0}
 
     for fid in csv_ids:
         bio = download_file_to_memory(fid)
@@ -100,27 +84,35 @@ def sugarcane_locations():
 
         for row in reader:
             try:
-                # parse geometry
-                geo = json.loads(row[".geo"])
-                lon, lat = geo["coordinates"]
-
-                # parse NDVI
-                ndvi = float(row.get("NDVI", 0))
-
-                # classify based on NDVI only
-                stage, color = classify_growth_stage(ndvi)
-                if stage == "No Sugarcane":
+                # Basic validation
+                if not row.get("lat") or not row.get("lng"):
                     continue
 
-                points.append({"lat": lat, "lng": lon, "stage": stage, "color": color})
-                summary[stage] += 1
+                lat = float(row["lat"])
+                lng = float(row["lng"])
+
+                # Handle missing or invalid n_tallmonths safely
+                n_tallmonths_str = row.get("n_tallmonths", "").strip()
+                if n_tallmonths_str == "":
+                    n_tallmonths = None
+                else:
+                    n_tallmonths = int(float(n_tallmonths_str))
+
+                growth_stage = row.get("growth_stage", "Unknown")
+
+                points.append({
+                    "lat": lat,
+                    "lng": lng,
+                    "n_tallmonths": n_tallmonths,
+                    "growth_stage": growth_stage
+                })
 
             except Exception as e:
                 logging.warning(f"Error parsing row: {e}")
                 continue
 
     logging.info(f"Returning {len(points)} sugarcane points.")
-    return jsonify({"points": points, "summary": summary})
+    return jsonify({"points": points})
 
 if __name__ == "__main__":
     app.run(debug=True)
