@@ -1,14 +1,11 @@
 import os
-import io
-import csv
 import logging
-import time
 from flask import Flask, jsonify
 from flask_cors import CORS
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
-# Setup
+# ---- Setup ----
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 CORS(app)
@@ -16,7 +13,10 @@ CORS(app)
 # ---- Paths & Credentials ----
 current_dir = os.path.dirname(os.path.abspath(__file__))
 SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
-SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly", "https://www.googleapis.com/auth/drive.readonly"]
+SCOPES = [
+    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "https://www.googleapis.com/auth/drive.readonly"
+]
 SPREADSHEET_FOLDER_ID = "1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK"
 
 credentials = service_account.Credentials.from_service_account_file(
@@ -26,70 +26,72 @@ drive_service = build("drive", "v3", credentials=credentials)
 sheets_service = build("sheets", "v4", credentials=credentials)
 
 # ---- Helpers ----
-def list_sheet_file_ids():
+def list_sheet_files():
     try:
-        resp = drive_service.files().list(
+        result = drive_service.files().list(
             q=f"'{SPREADSHEET_FOLDER_ID}' in parents and mimeType='application/vnd.google-apps.spreadsheet'",
             fields="files(id, name)",
             pageSize=1000
         ).execute()
-        files = resp.get("files", [])
-        logging.info(f"Found {len(files)} Sheets in Drive folder.")
-        return [f["id"] for f in files]
+        files = result.get('files', [])
+        logging.info(f"Found {len(files)} spreadsheet(s) in folder.")
+        return files
     except Exception as e:
-        logging.error(f"Error listing Sheets: {e}")
+        logging.error(f"Error listing spreadsheet files: {e}")
         return []
 
-def fetch_sheet_data(sheet_id):
-    try:
-        resp = sheets_service.spreadsheets().values().get(
-            spreadsheetId=sheet_id,
-            range="A1:E"  # Columns: lat, lng, n_tallmonths, ndvi, growth_stage
-        ).execute()
-        values = resp.get('values', [])
-        if not values or len(values) < 2:
-            return []
+def batch_fetch_sheet_data(sheet_files):
+    points = []
+    for file in sheet_files:
+        sheet_id = file['id']
+        try:
+            # Try to fetch values from the Sheet
+            resp = sheets_service.spreadsheets().values().get(
+                spreadsheetId=sheet_id,
+                range="A2:E",
+                majorDimension="ROWS"
+            ).execute()
 
-        header = values[0]
-        rows = values[1:]
-
-        data = []
-        for row in rows:
-            try:
-                lat = float(row[0])
-                lng = float(row[1])
-                n_tallmonths = int(row[2]) if row[2].isdigit() else 0
-                ndvi = float(row[3]) if row[3] else None
-                growth_stage = row[4] if len(row) > 4 else "Unknown"
-
-                data.append({
-                    "lat": lat,
-                    "lng": lng,
-                    "n_tallmonths": n_tallmonths,
-                    "ndvi": ndvi,
-                    "growth_stage": growth_stage
-                })
-            except Exception as e:
-                logging.warning(f"Error parsing row: {row} -> {e}")
+            if not resp:
+                logging.warning(f"Empty response for sheet {sheet_id}, skipping.")
                 continue
 
-        return data
+            rows = resp.get('values', [])
+            if not rows:
+                logging.warning(f"No rows in sheet {sheet_id}, skipping.")
+                continue
 
-    except Exception as e:
-        logging.error(f"Error fetching sheet {sheet_id}: {e}")
-        return []
+            for row in rows:
+                try:
+                    lat = float(row[0]) if len(row) > 0 else None
+                    lng = float(row[1]) if len(row) > 1 else None
+                    n_tallmonths = int(row[2]) if len(row) > 2 and row[2].isdigit() else 0
+                    ndvi = float(row[3]) if len(row) > 3 and row[3] else None
+                    growth_stage = row[4] if len(row) > 4 else "Unknown"
+
+                    if lat is not None and lng is not None:
+                        points.append({
+                            "lat": lat,
+                            "lng": lng,
+                            "n_tallmonths": n_tallmonths,
+                            "ndvi": ndvi,
+                            "growth_stage": growth_stage
+                        })
+                except Exception as parse_err:
+                    logging.warning(f"Skipping bad row {row}: {parse_err}")
+        except Exception as fetch_err:
+            logging.error(f"Error fetching or reading sheet {sheet_id}: {fetch_err}")
+            continue
+    return points
 
 # ---- API ----
 @app.route("/sugarcane-locations", methods=["GET"])
 def sugarcane_locations():
-    sheet_ids = list_sheet_file_ids()
-    if not sheet_ids:
-        return jsonify({"error": "No Sheets found."}), 500
+    sheet_files = list_sheet_files()
+    if not sheet_files:
+        return jsonify({"error": "No spreadsheets found."}), 500
 
-    points = []
-    for sheet_id in sheet_ids:
-        points.extend(fetch_sheet_data(sheet_id))
-
+    points = batch_fetch_sheet_data(sheet_files)
     logging.info(f"Returning {len(points)} sugarcane points.")
     return jsonify({"points": points})
 
