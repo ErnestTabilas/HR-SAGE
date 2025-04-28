@@ -122,6 +122,7 @@ const MapBoundsAdjuster = () => {
 const PixelCanvasLayer = ({ data = [], selectedStages }) => {
   const map = useMap();
   const layerRef = useRef();
+  const popupRef = useRef();
 
   useEffect(() => {
     if (layerRef.current) {
@@ -169,10 +170,56 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
     layerRef.current = new CustomCanvasLayer();
     layerRef.current.addTo(map);
 
+    const handleClick = (e) => {
+      const clickLatLng = e.latlng;
+      const clickPoint = map.project(clickLatLng, map.getZoom());
+      let minDist = Infinity;
+      let closestPoint = null;
+
+      data.forEach((d) => {
+        if (!selectedStages[d.growth_stage]) return;
+
+        const dataPoint = map.project([d.lat, d.lng], map.getZoom());
+        const dist = clickPoint.distanceTo(dataPoint);
+        if (dist < minDist) {
+          minDist = dist;
+          closestPoint = d;
+        }
+      });
+
+      const pixelThreshold = 10; // ~10 pixels
+      if (closestPoint && minDist <= pixelThreshold) {
+        if (popupRef.current) {
+          popupRef.current.remove();
+        }
+
+        const popupContent = `
+          <div style="min-width:180px;">
+            <strong>Growth Stage:</strong> ${closestPoint.growth_stage}<br/>
+            <strong>NDVI:</strong> ${closestPoint.ndvi}<br/>
+            <strong>Harvest Readiness:</strong> ${
+              closestPoint.harvest_readiness
+            }<br/>
+            <strong>Estimated Harvest:</strong> ${
+              closestPoint.estimated_harvest_date || "N/A"
+            }
+          </div>
+        `;
+
+        popupRef.current = L.popup()
+          .setLatLng([closestPoint.lat, closestPoint.lng])
+          .setContent(popupContent)
+          .openOn(map);
+      }
+    };
+
+    map.on("click", handleClick);
+
     return () => {
       if (layerRef.current) {
         map.removeLayer(layerRef.current);
       }
+      map.off("click", handleClick);
     };
   }, [data, selectedStages, map]);
 
