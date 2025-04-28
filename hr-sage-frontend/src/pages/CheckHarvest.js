@@ -6,6 +6,9 @@ import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
+// --- Global cache to persist across mounts ---
+let cachedLocations = null; // <-- ADD THIS
+
 // Map NDVI stage to a hex color
 const getColor = (stage) => {
   switch (stage) {
@@ -149,7 +152,7 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
         });
 
         const zoom = map.getZoom();
-        const radius = Math.max(1, (zoom - 5) * 1.5);
+        const radius = Math.max(0.15, (zoom - 5) * 1.01);
 
         pointsInTile.forEach((d) => {
           const latlngPoint = map.project([d.lat, d.lng], coords.z);
@@ -187,22 +190,40 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
         }
       });
 
-      const pixelThreshold = 10; // ~10 pixels
+      const pixelThreshold = 10; // 10 pixels
       if (closestPoint && minDist <= pixelThreshold) {
         if (popupRef.current) {
           popupRef.current.remove();
         }
 
+        const stage = closestPoint.growth_stage;
+        const ndvi = closestPoint.ndvi?.toFixed(2) ?? "N/A";
+
+        // Estimate harvest date
+        const today = new Date();
+        let estimatedHarvest = new Date(today);
+
+        if (stage === "Ripening") {
+          estimatedHarvest = today; // Now
+        } else if (stage === "Grand Growth") {
+          estimatedHarvest.setMonth(today.getMonth() + 4);
+        } else if (stage === "Tillering") {
+          estimatedHarvest.setMonth(today.getMonth() + 8);
+        } else if (stage === "Emergence") {
+          estimatedHarvest.setMonth(today.getMonth() + 11);
+        } else {
+          estimatedHarvest.setMonth(today.getMonth() + 13); // Default
+        }
+
+        const estimatedDate = estimatedHarvest.toISOString().split("T")[0]; // YYYY-MM-DD
+
         const popupContent = `
-          <div style="min-width:180px;">
-            <strong>Growth Stage:</strong> ${closestPoint.growth_stage}<br/>
-            <strong>NDVI:</strong> ${closestPoint.ndvi}<br/>
-            <strong>Harvest Readiness:</strong> ${
-              closestPoint.harvest_readiness
+          <div style="text-align:center;">
+            <strong style="color:${getColor(stage)}">${stage}</strong><br/>
+            ${
+              stage === "Ripening" ? "✔️ Ready for Harvest" : "⏳ Not Ready"
             }<br/>
-            <strong>Estimated Harvest:</strong> ${
-              closestPoint.estimated_harvest_date || "N/A"
-            }
+            <small>NDVI: ${ndvi} | Est. Harvest: ${estimatedDate}</small>
           </div>
         `;
 
@@ -258,16 +279,25 @@ const CheckHarvest = () => {
   }, []);
 
   useEffect(() => {
-    axios
-      .get("http://127.0.0.1:5000/sugarcane-locations")
-      .then((res) => {
-        setLocations(Array.isArray(res.data.points) ? res.data.points : []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error loading data:", err);
-        setLoading(false);
-      });
+    if (cachedLocations) {
+      // Use cached data
+      setLocations(cachedLocations);
+      setLoading(false);
+    } else {
+      // Fetch if no cache yet
+      axios
+        .get("http://127.0.0.1:5000/sugarcane-locations")
+        .then((res) => {
+          const points = Array.isArray(res.data.points) ? res.data.points : [];
+          cachedLocations = points; // Set global cache
+          setLocations(points);
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error("Error loading data:", err);
+          setLoading(false);
+        });
+    }
   }, []);
 
   const searchLocation = async (q) => {
