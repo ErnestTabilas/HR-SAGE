@@ -50,10 +50,10 @@ def list_sheet_files():
         logging.error(f"Error listing spreadsheet files: {e}")
         return []
 
-MAX_RETRIES = 5  # realistic retry limit
-INITIAL_BACKOFF = 3  # seconds to wait initially
+MAX_RETRIES = 5
+INITIAL_BACKOFF = 3
 
-def fetch_with_retry(sheet_id):
+def fetch_sheet_rows_with_retry(sheet_id):
     retries = 0
     backoff = INITIAL_BACKOFF
 
@@ -74,27 +74,7 @@ def fetch_with_retry(sheet_id):
                 logging.warning(f"No rows in sheet {sheet_id}, skipping.")
                 return []
 
-            points = []
-            for row in rows:
-                try:
-                    lat = float(row[0]) if len(row) > 0 else None
-                    lng = float(row[1]) if len(row) > 1 else None
-                    n_tallmonths = int(row[2]) if len(row) > 2 and row[2].isdigit() else 0
-                    ndvi = float(row[3]) if len(row) > 3 and row[3] else None
-                    growth_stage = row[4] if len(row) > 4 else "Unknown"
-
-                    if lat is not None and lng is not None:
-                        points.append({
-                            "lat": lat,
-                            "lng": lng,
-                            "n_tallmonths": n_tallmonths,
-                            "ndvi": ndvi,
-                            "growth_stage": growth_stage
-                        })
-                except Exception as parse_err:
-                    logging.warning(f"Skipping bad row {row}: {parse_err}")
-
-            return points
+            return rows
 
         except Exception as fetch_err:
             retries += 1
@@ -108,16 +88,39 @@ def fetch_with_retry(sheet_id):
                 logging.warning("SSL error detected. Refreshing Google API clients...")
                 refresh_services()
 
-            # Exponential backoff
             time.sleep(backoff)
-            backoff *= 2  # double wait time for next retry
+            backoff *= 2
 
-# ---- Batch Fetch ----
-def batch_fetch_sheet_data(sheet_files):
-    points = []
+def batch_fetch_and_merge_sheet_data(sheet_files):
+    merged_rows = []
+
     for file in sheet_files:
         sheet_id = file['id']
-        points.extend(fetch_with_retry(sheet_id))
+        rows = fetch_sheet_rows_with_retry(sheet_id)
+        merged_rows.extend(rows)
+
+    return merged_rows
+
+def parse_merged_rows(rows):
+    points = []
+    for row in rows:
+        try:
+            lat = float(row[0]) if len(row) > 0 else None
+            lng = float(row[1]) if len(row) > 1 else None
+            n_tallmonths = int(row[2]) if len(row) > 2 and row[2].isdigit() else 0
+            ndvi = float(row[3]) if len(row) > 3 and row[3] else None
+            growth_stage = row[4] if len(row) > 4 else "Unknown"
+
+            if lat is not None and lng is not None:
+                points.append({
+                    "lat": lat,
+                    "lng": lng,
+                    "n_tallmonths": n_tallmonths,
+                    "ndvi": ndvi,
+                    "growth_stage": growth_stage
+                })
+        except Exception as parse_err:
+            logging.warning(f"Skipping bad row {row}: {parse_err}")
     return points
 
 # ---- API ----
@@ -127,8 +130,9 @@ def sugarcane_locations():
     if not sheet_files:
         return jsonify({"error": "No spreadsheets found."}), 500
 
-    points = batch_fetch_sheet_data(sheet_files)
-    logging.info(f"Returning {len(points)} sugarcane points.")
+    merged_rows = batch_fetch_and_merge_sheet_data(sheet_files)
+    points = parse_merged_rows(merged_rows)
+    logging.info(f"Returning {len(points)} sugarcane points from merged sheets.")
     return jsonify({"points": points})
 
 if __name__ == "__main__":

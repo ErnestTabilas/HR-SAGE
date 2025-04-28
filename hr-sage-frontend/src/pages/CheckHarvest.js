@@ -106,7 +106,7 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   );
 };
 
-// Force initial fit to the PH bounds
+// MapBoundsAdjuster
 const MapBoundsAdjuster = () => {
   const map = useMap();
   useEffect(() => {
@@ -118,78 +118,61 @@ const MapBoundsAdjuster = () => {
   return null;
 };
 
-// Draw actual pixels as circles (optimized)
-const PixelLayer = ({ data = [], selectedStages }) => {
+// Optimized custom CanvasLayer
+const PixelCanvasLayer = ({ data = [], selectedStages }) => {
   const map = useMap();
-  const layerGroupRef = useRef(L.layerGroup().addTo(map));
-  const circleRefs = useRef([]);
-
-  const getRadius = (zoom) => {
-    return Math.max(1.0, (zoom - 5) * 1.2);
-  };
+  const layerRef = useRef();
 
   useEffect(() => {
-    const layerGroup = layerGroupRef.current;
-    layerGroup.clearLayers();
-    circleRefs.current = [];
+    if (layerRef.current) {
+      map.removeLayer(layerRef.current);
+    }
 
-    const canvasOptions = {
-      renderer: L.canvas({ padding: 0.5 }),
-    };
+    const CustomCanvasLayer = L.GridLayer.extend({
+      createTile: function (coords) {
+        const tile = document.createElement("canvas");
+        tile.width = 256;
+        tile.height = 256;
+        const ctx = tile.getContext("2d");
 
-    const filtered = data.filter((d) => selectedStages[d.growth_stage]);
+        const bounds = this._tileCoordsToBounds(coords);
 
-    filtered.forEach((d) => {
-      const popupContent = `
-        <div style="text-align: center;">
-          <strong style="color: ${getColor(d.growth_stage)};">
-            ${d.growth_stage}
-          </strong>
-          <br/>
-          ${
-            d.growth_stage === "Ripening"
-              ? "✔️ Ready for Harvest"
-              : "⏳ Not Ready Yet"
-          }
-        </div>
-      `;
+        const pointsInTile = data.filter((d) => {
+          return (
+            d.lat < bounds.getNorth() &&
+            d.lat > bounds.getSouth() &&
+            d.lng > bounds.getWest() &&
+            d.lng < bounds.getEast() &&
+            selectedStages[d.growth_stage]
+          );
+        });
 
-      const circle = L.circleMarker([d.lat, d.lng], {
-        radius: getRadius(map.getZoom()),
-        color: getColor(d.growth_stage),
-        fillColor: getColor(d.growth_stage),
-        fillOpacity: 0.7,
-        weight: 0,
-        ...canvasOptions,
-      }).bindPopup(popupContent);
+        const zoom = map.getZoom();
+        const radius = Math.max(1, (zoom - 5) * 1.5);
 
-      layerGroup.addLayer(circle);
-      circleRefs.current.push(circle);
+        pointsInTile.forEach((d) => {
+          const latlngPoint = map.project([d.lat, d.lng], coords.z);
+          const tileOrigin = map.project(bounds.getNorthWest(), coords.z);
+          const x = latlngPoint.x - tileOrigin.x;
+          const y = latlngPoint.y - tileOrigin.y;
+
+          ctx.beginPath();
+          ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
+          ctx.fillStyle = getColor(d.growth_stage);
+          ctx.fill();
+        });
+
+        return tile;
+      },
     });
 
-    const updateCircleSizes = () => {
-      const zoom = map.getZoom();
-      const targetRadius = getRadius(zoom);
-
-      circleRefs.current.forEach((circle) => {
-        const currentRadius = circle.getRadius();
-        const delta = targetRadius - currentRadius;
-
-        if (Math.abs(delta) > 0.1) {
-          circle.setRadius(currentRadius + delta * 0.2);
-        } else {
-          circle.setRadius(targetRadius);
-        }
-      });
-
-      requestAnimationFrame(updateCircleSizes);
-    };
-
-    updateCircleSizes();
+    layerRef.current = new CustomCanvasLayer();
+    layerRef.current.addTo(map);
 
     return () => {
-      layerGroup.clearLayers();
-      circleRefs.current = [];
+      if (layerRef.current) {
+        map.removeLayer(layerRef.current);
+      }
     };
   }, [data, selectedStages, map]);
 
@@ -302,7 +285,10 @@ const CheckHarvest = () => {
           >
             <MapBoundsAdjuster />
             <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <PixelLayer data={locations} selectedStages={selectedStages} />
+            <PixelCanvasLayer
+              data={locations}
+              selectedStages={selectedStages}
+            />
           </MapContainer>
         )}
       </div>
