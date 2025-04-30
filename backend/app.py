@@ -51,7 +51,7 @@ def list_sheet_files():
         return []
 
 # Retry logic setup
-MAX_RETRIES = 5
+MAX_RETRIES = 9999
 INITIAL_BACKOFF = 3
 
 def fetch_sheet_rows_with_retry(sheet_id):
@@ -112,7 +112,7 @@ def parse_merged_rows(rows):
             ndvi = float(row[3]) if len(row) > 3 and row[3] else None
             growth_stage = row[4] if len(row) > 4 else "Unknown"
 
-            if lat is not None and lng is not None:
+            if lat is not None and lng is not None and ndvi >= 0:
                 points.append({
                     "lat": lat,
                     "lng": lng,

@@ -6,10 +6,8 @@ import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
-// --- Global cache to persist across mounts ---
-let cachedLocations = null; // <-- ADD THIS
+let cachedLocations = null;
 
-// Map NDVI stage to a hex color
 const getColor = (stage) => {
   switch (stage) {
     case "Germination":
@@ -25,7 +23,6 @@ const getColor = (stage) => {
   }
 };
 
-// Legend component
 const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const stageInfo = [
@@ -37,7 +34,6 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
 
   return (
     <div className="space-y-4 px-4">
-      {/* Search */}
       <div className="bg-white p-5 shadow-md rounded-lg">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           Search for a Place
@@ -59,7 +55,6 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
         </div>
       </div>
 
-      {/* Growth Stages */}
       <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           Sugarcane Growth Stages
@@ -93,7 +88,6 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
         </table>
       </div>
 
-      {/* About */}
       <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
         <h4 className="font-bold text-lg mb-3 text-green-700">
           About this Map
@@ -105,11 +99,23 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
           Hover over a pixel to see its stage and readiness.
         </p>
       </div>
+
+      <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
+        <h4 className="font-bold text-lg mb-3 text-green-700">Snapshot</h4>
+        <img
+          src="/assets/map_snapshot.png"
+          alt="Map snapshot"
+          className="w-full rounded-lg border border-gray-300 shadow-sm"
+        />
+        <p className="text-xs mt-2 text-gray-500">
+          Sample view of sugarcane growth stages in Negros Occidental, April
+          2025
+        </p>
+      </div>
     </div>
   );
 };
 
-// MapBoundsAdjuster
 const MapBoundsAdjuster = () => {
   const map = useMap();
   useEffect(() => {
@@ -121,7 +127,6 @@ const MapBoundsAdjuster = () => {
   return null;
 };
 
-// Optimized custom CanvasLayer
 const PixelCanvasLayer = ({ data = [], selectedStages }) => {
   const map = useMap();
   const layerRef = useRef();
@@ -140,19 +145,17 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
         const ctx = tile.getContext("2d");
 
         const bounds = this._tileCoordsToBounds(coords);
-
         const pointsInTile = data.filter((d) => {
           return (
             d.lat < bounds.getNorth() &&
             d.lat > bounds.getSouth() &&
             d.lng > bounds.getWest() &&
             d.lng < bounds.getEast() &&
-            selectedStages[d.growth_stage]
+            selectedStages[d.growth_stage.trim()]
           );
         });
 
-        const zoom = map.getZoom();
-        const radius = Math.max(0.15, (zoom - 5) * 1.01);
+        const radius = Math.max(0.15, (map.getZoom - 5) * 1.2);
 
         pointsInTile.forEach((d) => {
           const latlngPoint = map.project([d.lat, d.lng], coords.z);
@@ -190,32 +193,25 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
         }
       });
 
-      const pixelThreshold = 10; // 10 pixels
+      const pixelThreshold = 10;
       if (closestPoint && minDist <= pixelThreshold) {
-        if (popupRef.current) {
-          popupRef.current.remove();
-        }
+        if (popupRef.current) popupRef.current.remove();
 
         const stage = closestPoint.growth_stage;
         const ndvi = closestPoint.ndvi?.toFixed(2) ?? "N/A";
-
-        // Estimate harvest date
         const today = new Date();
         let estimatedHarvest = new Date(today);
 
-        if (stage === "Ripening") {
-          estimatedHarvest = today; // Now
-        } else if (stage === "Grand Growth") {
+        if (stage === "Ripening") estimatedHarvest = today;
+        else if (stage === "Grand Growth")
           estimatedHarvest.setMonth(today.getMonth() + 4);
-        } else if (stage === "Tillering") {
+        else if (stage === "Tillering")
           estimatedHarvest.setMonth(today.getMonth() + 8);
-        } else if (stage === "Emergence") {
+        else if (stage === "Emergence")
           estimatedHarvest.setMonth(today.getMonth() + 11);
-        } else {
-          estimatedHarvest.setMonth(today.getMonth() + 13); // Default
-        }
+        else estimatedHarvest.setMonth(today.getMonth() + 13);
 
-        const estimatedDate = estimatedHarvest.toISOString().split("T")[0]; // YYYY-MM-DD
+        const estimatedDate = estimatedHarvest.toISOString().split("T")[0];
 
         const popupContent = `
           <div style="text-align:center;">
@@ -223,7 +219,7 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
             ${
               stage === "Ripening" ? "✔️ Ready for Harvest" : "⏳ Not Ready"
             }<br/>
-            <small>NDVI: ${ndvi} | Est. Harvest: ${estimatedDate}</small>
+            <small>NDVI: ${ndvi} | Est. Harvest: ${estimatedDate}</small><br/>
           </div>
         `;
 
@@ -237,9 +233,7 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
     map.on("click", handleClick);
 
     return () => {
-      if (layerRef.current) {
-        map.removeLayer(layerRef.current);
-      }
+      if (layerRef.current) map.removeLayer(layerRef.current);
       map.off("click", handleClick);
     };
   }, [data, selectedStages, map]);
@@ -247,7 +241,6 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
   return null;
 };
 
-// Main component
 const CheckHarvest = () => {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -261,7 +254,7 @@ const CheckHarvest = () => {
   const mapRef = useRef();
 
   const loadingTips = [
-    "💡 Tip: Hover over pixels to see details.",
+    "💡 Tip: Click on sugarcane points to see details.",
     "🧭 Tip: Use the search bar to zoom.",
     "🔍 Tip: Toggle stages in the legend.",
     "🌱 Germination (NDVI 0.1–0.2): Early growth.",
@@ -280,22 +273,19 @@ const CheckHarvest = () => {
 
   useEffect(() => {
     if (cachedLocations) {
-      // Use cached data
       setLocations(cachedLocations);
       setLoading(false);
     } else {
-      // Fetch if no cache yet
       axios
         .get("http://127.0.0.1:5000/sugarcane-locations")
         .then((res) => {
           const points = Array.isArray(res.data.points) ? res.data.points : [];
-          cachedLocations = points; // Set global cache
+          cachedLocations = points;
           setLocations(points);
           setLoading(false);
         })
         .catch((err) => {
           console.error("Error loading data:", err);
-          setLoading(false);
         });
     }
   }, []);
@@ -326,7 +316,6 @@ const CheckHarvest = () => {
 
   return (
     <div className="flex h-screen">
-      {/* Sidebar */}
       <div className="bg-green-50 w-1/4 p-6 overflow-y-auto border-r">
         <Legend
           onSearch={searchLocation}
@@ -335,7 +324,6 @@ const CheckHarvest = () => {
         />
       </div>
 
-      {/* Map */}
       <div className="w-3/4 relative z-0">
         {loading ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-80 z-10">
@@ -357,11 +345,13 @@ const CheckHarvest = () => {
             zoom={7}
             minZoom={6}
             maxZoom={24}
-            scrollWheelZoom
-            maxBoundsViscosity={1.0}
+            scrollWheelZoom={true}
           >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution="&copy; OpenStreetMap contributors"
+            />
             <MapBoundsAdjuster />
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <PixelCanvasLayer
               data={locations}
               selectedStages={selectedStages}
