@@ -93,7 +93,9 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
                   ></span>
                   {stage.name}
                 </td>
-                <td className="text-right text-gray-600">{stage.range}</td>
+                <td className="text-right text-gray-600 text-xs">
+                  {stage.range}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -103,10 +105,10 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
       <div className="bg-white p-4 rounded-xl shadow text-sm text-gray-700 space-y-2">
         <h4 className="text-lg font-bold text-green-700">About this Map</h4>
         <p>
-          This map visualizes sugarcane growth stages via NDVI/EVI pixel
-          overlays.
-          <br />
-          Click a pixel to view stage & harvest readiness.
+          This map visualizes sugarcane growth stages via NDVI pixel overlays.
+          Click a pixel to view stage & harvest readiness. Click on the colored
+          ellipses on the Legend panel to toggle which sugarcane growth stage to
+          display on the map.
         </p>
       </div>
     </div>
@@ -152,7 +154,11 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
           );
         });
 
-        const radius = 0.1;
+        const zoom = coords.z;
+
+        // Dynamic radius: base radius 0.1 at zoom level 7, doubling each zoom level
+        const baseZoom = 7;
+        const radius = 0.1 * Math.pow(2, zoom - baseZoom);
 
         pointsInTile.forEach((d) => {
           const latlngPoint = map.project([d.lat, d.lng], coords.z);
