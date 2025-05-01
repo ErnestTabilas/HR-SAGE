@@ -287,6 +287,7 @@ const CheckHarvest = () => {
         })
         .catch((err) => {
           console.error("Error loading data:", err);
+          setLoading(false);
         });
     }
   }, []);
@@ -311,33 +312,139 @@ const CheckHarvest = () => {
     setSelectedStages((prev) => ({ ...prev, [stage]: !prev[stage] }));
 
   const pdfStyles = StyleSheet.create({
-    page: { padding: 20, fontFamily: "Helvetica" },
-    header: { alignItems: "center", marginBottom: 10 },
-    logo: { width: 60, height: 20, marginBottom: 5 },
-    title: { fontSize: 16, marginBottom: 4 },
-    timestamp: { fontSize: 10, color: "gray", marginBottom: 8 },
-    bbox: { fontSize: 10, marginBottom: 4 },
-    mapImage: { width: "100%", height: "auto", marginTop: 10 },
+    page: { padding: 30, fontFamily: "Helvetica", backgroundColor: "#f0fdf4" },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      backgroundColor: "#047857",
+      padding: 10,
+      borderRadius: 6,
+      marginBottom: 12,
+    },
+    logo: { width: 50, height: 50 },
+    headerTextContainer: { flexDirection: "column", justifyContent: "center" },
+    title: { fontSize: 18, color: "white", fontWeight: 700 },
+    timestamp: { fontSize: 10, color: "#d1fae5" },
+    infoRow: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "flex-start",
+      marginBottom: 10,
+      gap: 20,
+    },
+    legendContainer: {
+      padding: 10,
+      backgroundColor: "#ecfdf5",
+      borderRadius: 6,
+      minWidth: "50%",
+    },
+    legendItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    legendColor: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      marginRight: 6,
+    },
+    legendLabel: { fontSize: 10, color: "#065f46" },
+    bboxContainer: {
+      padding: 10,
+      backgroundColor: "#ecfdf5",
+      borderRadius: 4,
+      minWidth: "40%",
+    },
+    legendTitle: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#065f46",
+      paddingBottom: 8,
+    },
+    bbox: { fontSize: 10, color: "#065f46" },
+    mapImage: {
+      width: "100%",
+      marginTop: 12,
+      borderRadius: 6,
+      border: "1pt solid #047857", // Tailwind: border border-emerald-700
+    },
   });
 
   const MapPDFDocument = ({ imgData, bounds, timestamp }) => (
     <Document>
       <Page size="A4" style={pdfStyles.page} orientation="portrait">
         <View style={pdfStyles.header}>
-          <PDFImage src="/assets/logo.png" style={pdfStyles.logo} />
-          <Text style={pdfStyles.title}>HR‑SAGE Sugarcane Map</Text>
-          <Text style={pdfStyles.timestamp}>Generated: {timestamp}</Text>
+          <PDFImage src="logo.png" style={pdfStyles.logo} />
+          <View style={pdfStyles.headerTextContainer}>
+            <Text style={pdfStyles.title}>HR‑SAGE Sugarcane Map</Text>
+            <Text style={pdfStyles.timestamp}>Generated: {timestamp}</Text>
+          </View>
         </View>
-        <View>
-          <Text style={pdfStyles.bbox}>
-            NE: {bounds.getNorthEast().lat.toFixed(4)},{" "}
-            {bounds.getNorthEast().lng.toFixed(4)}
-          </Text>
-          <Text style={pdfStyles.bbox}>
-            SW: {bounds.getSouthWest().lat.toFixed(4)},{" "}
-            {bounds.getSouthWest().lng.toFixed(4)}
-          </Text>
+
+        <View style={pdfStyles.infoRow}>
+          <View style={pdfStyles.legendContainer}>
+            <Text style={pdfStyles.legendTitle}>
+              Legend: Sugarcane Growth Stages
+            </Text>
+            <View style={pdfStyles.legendItem}>
+              <View
+                style={{
+                  ...pdfStyles.legendColor,
+                  backgroundColor: getColor("Germination"),
+                }}
+              />
+              <Text style={pdfStyles.legendLabel}>
+                Germination (NDVI 0.1–0.2)
+              </Text>
+            </View>
+            <View style={pdfStyles.legendItem}>
+              <View
+                style={{
+                  ...pdfStyles.legendColor,
+                  backgroundColor: getColor("Tillering"),
+                }}
+              />
+              <Text style={pdfStyles.legendLabel}>
+                Tillering (NDVI 0.2–0.3)
+              </Text>
+            </View>
+            <View style={pdfStyles.legendItem}>
+              <View
+                style={{
+                  ...pdfStyles.legendColor,
+                  backgroundColor: getColor("Grand Growth"),
+                }}
+              />
+              <Text style={pdfStyles.legendLabel}>
+                Grand Growth (NDVI 0.3–0.4)
+              </Text>
+            </View>
+            <View style={pdfStyles.legendItem}>
+              <View
+                style={{
+                  ...pdfStyles.legendColor,
+                  backgroundColor: getColor("Ripening"),
+                }}
+              />
+              <Text style={pdfStyles.legendLabel}>Ripening (NDVI 0.4–0.5)</Text>
+            </View>
+          </View>
+
+          <View style={pdfStyles.bboxContainer}>
+            <Text style={pdfStyles.legendTitle}>Map Bounds</Text>
+            <Text style={pdfStyles.bbox}>
+              Northeast: {bounds.getNorthEast().lat.toFixed(4)},{" "}
+              {bounds.getNorthEast().lng.toFixed(4)}
+            </Text>
+            <Text style={pdfStyles.bbox}>
+              Southwest: {bounds.getSouthWest().lat.toFixed(4)},{" "}
+              {bounds.getSouthWest().lng.toFixed(4)}
+            </Text>
+          </View>
         </View>
+
         <PDFImage src={imgData} style={pdfStyles.mapImage} />
       </Page>
     </Document>
@@ -351,17 +458,14 @@ const CheckHarvest = () => {
   const handleGenerateAndDownloadPDF = async () => {
     const mapEl = document.querySelector(".leaflet-container");
     if (!mapEl) return;
-
     const canvas = await html2canvas(mapEl, { useCORS: true });
     const imgData = canvas.toDataURL("image/png");
     const bounds = mapRef.current.getBounds();
     const timestamp = new Date().toLocaleString();
-
     const doc = (
       <MapPDFDocument imgData={imgData} bounds={bounds} timestamp={timestamp} />
     );
     const blob = await pdf(doc).toBlob();
-
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
