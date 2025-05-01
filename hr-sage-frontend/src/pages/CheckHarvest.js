@@ -480,7 +480,7 @@ const CheckHarvest = () => {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 p-6 lg:p-12">
+    <div className="flex flex-col lg:flex-row gap-6 p-6 lg:p-12 h-screen">
       <div className="lg:w-1/4">
         <Legend
           onSearch={searchLocation}

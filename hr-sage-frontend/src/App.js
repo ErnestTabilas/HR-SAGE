@@ -183,7 +183,7 @@ const MainContent = () => {
         </nav>
       </div>
 
-      <div className="p-4">
+      <div className="flex-grow p-0">
         {/* Use motion.div to apply page transition */}
         <motion.div
           key={location.key}
