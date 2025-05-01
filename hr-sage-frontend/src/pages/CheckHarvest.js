@@ -3,6 +3,18 @@ import { MapContainer, TileLayer, useMap, Popup } from "react-leaflet";
 import L from "leaflet";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
+import html2canvas from "html2canvas";
+import {
+  pdf,
+  Document,
+  Page,
+  View,
+  Text,
+  Image as PDFImage,
+  StyleSheet,
+  PDFDownloadLink,
+  BlobProvider,
+} from "@react-pdf/renderer";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
@@ -13,11 +25,11 @@ const getColor = (stage) => {
     case "Germination":
       return "#ef4444";
     case "Tillering":
-      return "#f97316";
+      return "#ff8c00";
     case "Grand Growth":
-      return "#eab308";
+      return "#7F00FF";
     case "Ripening":
-      return "#22c55e";
+      return "#0000FF";
     default:
       return "#9ca3af";
   }
@@ -28,88 +40,71 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   const stageInfo = [
     { name: "Germination", color: "bg-red-500", range: "(0.1 - 0.2)" },
     { name: "Tillering", color: "bg-orange-500", range: "(0.2 - 0.4)" },
-    { name: "Grand Growth", color: "bg-yellow-500", range: "(0.5 - 0.7)" },
-    { name: "Ripening", color: "bg-green-500", range: "(0.3 - 0.5)" },
+    { name: "Grand Growth", color: "bg-violet-500", range: "(0.5 - 0.7)" },
+    { name: "Ripening", color: "bg-blue-500", range: "(0.3 - 0.5)" },
   ];
 
   return (
-    <div className="space-y-4 px-4">
-      <div className="bg-white p-5 shadow-md rounded-lg">
-        <h4 className="font-bold text-lg mb-3 text-green-700">
-          Search for a Place
-        </h4>
-        <div className="flex items-center">
+    <div className="space-y-6 px-4">
+      <div className="bg-white p-4 rounded-xl shadow space-y-3">
+        <h4 className="text-lg font-bold text-green-700">Search for a Place</h4>
+        <div className="flex">
           <input
             type="text"
-            className="border-2 rounded-l-md w-full p-2"
-            placeholder="Enter a place name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Enter a place name..."
+            className="flex-grow border border-gray-300 rounded-l-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
           <button
-            className="bg-emerald-600 px-3 py-2 rounded-r-md hover:bg-emerald-700"
             onClick={() => searchTerm && onSearch(searchTerm)}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-r-md"
           >
-            <FontAwesomeIcon icon={faSearch} className="text-white" />
+            <FontAwesomeIcon icon={faSearch} />
           </button>
         </div>
       </div>
 
-      <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
-        <h4 className="font-bold text-lg mb-3 text-green-700">
+      <div className="bg-white p-4 rounded-xl shadow space-y-2">
+        <h4 className="text-lg font-bold text-green-700">
           Sugarcane Growth Stages
         </h4>
-        <table className="w-full">
+        <table className="w-full text-sm">
           <thead>
-            <tr>
-              <th className="text-left pb-2">Stage</th>
-              <th className="text-right pb-2">NDVI</th>
+            <tr className="text-left text-gray-500">
+              <th>Stage</th>
+              <th className="text-right">NDVI</th>
             </tr>
           </thead>
           <tbody>
             {stageInfo.map((stage) => (
               <tr
                 key={stage.name}
-                className="cursor-pointer"
                 onClick={() => onToggleStage(stage.name)}
+                className="cursor-pointer hover:bg-gray-100"
               >
-                <td className="flex items-center space-x-2">
+                <td className="flex items-center gap-2 py-1">
                   <span
-                    className={`rounded-full w-5 h-5 ${
+                    className={`w-4 h-4 rounded-full ${
                       selectedStages[stage.name] ? stage.color : "bg-gray-300"
                     }`}
                   ></span>
-                  <span>{stage.name}</span>
+                  {stage.name}
                 </td>
-                <td className="text-right text-xs">{stage.range}</td>
+                <td className="text-right text-gray-600">{stage.range}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
-        <h4 className="font-bold text-lg mb-3 text-green-700">
-          About this Map
-        </h4>
-        <p className="text-sm text-gray-600 leading-relaxed">
+      <div className="bg-white p-4 rounded-xl shadow text-sm text-gray-700 space-y-2">
+        <h4 className="text-lg font-bold text-green-700">About this Map</h4>
+        <p>
           This map visualizes sugarcane growth stages via NDVI/EVI pixel
           overlays.
           <br />
-          Hover over a pixel to see its stage and readiness.
-        </p>
-      </div>
-
-      <div className="bg-white p-5 shadow-md rounded-lg text-gray-700">
-        <h4 className="font-bold text-lg mb-3 text-green-700">Snapshot</h4>
-        <img
-          src="/assets/map_snapshot.png"
-          alt="Map snapshot"
-          className="w-full rounded-lg border border-gray-300 shadow-sm"
-        />
-        <p className="text-xs mt-2 text-gray-500">
-          Sample view of sugarcane growth stages in Negros Occidental, April
-          2025
+          Click a pixel to view stage & harvest readiness.
         </p>
       </div>
     </div>
@@ -155,7 +150,7 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
           );
         });
 
-        const radius = Math.max(0.15, (map.getZoom - 5) * 1.2);
+        const radius = 0.1;
 
         pointsInTile.forEach((d) => {
           const latlngPoint = map.project([d.lat, d.lng], coords.z);
@@ -251,6 +246,12 @@ const CheckHarvest = () => {
     "Grand Growth": true,
     Ripening: true,
   });
+  const [pdfData, setPdfData] = useState({
+    imgData: null,
+    bounds: null,
+    timestamp: null,
+  });
+
   const mapRef = useRef();
 
   const loadingTips = [
@@ -309,10 +310,67 @@ const CheckHarvest = () => {
   const toggleStage = (stage) =>
     setSelectedStages((prev) => ({ ...prev, [stage]: !prev[stage] }));
 
+  const pdfStyles = StyleSheet.create({
+    page: { padding: 20, fontFamily: "Helvetica" },
+    header: { alignItems: "center", marginBottom: 10 },
+    logo: { width: 60, height: 20, marginBottom: 5 },
+    title: { fontSize: 16, marginBottom: 4 },
+    timestamp: { fontSize: 10, color: "gray", marginBottom: 8 },
+    bbox: { fontSize: 10, marginBottom: 4 },
+    mapImage: { width: "100%", height: "auto", marginTop: 10 },
+  });
+
+  const MapPDFDocument = ({ imgData, bounds, timestamp }) => (
+    <Document>
+      <Page size="A4" style={pdfStyles.page} orientation="portrait">
+        <View style={pdfStyles.header}>
+          <PDFImage src="/assets/logo.png" style={pdfStyles.logo} />
+          <Text style={pdfStyles.title}>HR‑SAGE Sugarcane Map</Text>
+          <Text style={pdfStyles.timestamp}>Generated: {timestamp}</Text>
+        </View>
+        <View>
+          <Text style={pdfStyles.bbox}>
+            NE: {bounds.getNorthEast().lat.toFixed(4)},{" "}
+            {bounds.getNorthEast().lng.toFixed(4)}
+          </Text>
+          <Text style={pdfStyles.bbox}>
+            SW: {bounds.getSouthWest().lat.toFixed(4)},{" "}
+            {bounds.getSouthWest().lng.toFixed(4)}
+          </Text>
+        </View>
+        <PDFImage src={imgData} style={pdfStyles.mapImage} />
+      </Page>
+    </Document>
+  );
+
   const PH_BOUNDS = [
     [4.5, 116.5],
     [21.5, 126.5],
   ];
+
+  const handleGenerateAndDownloadPDF = async () => {
+    const mapEl = document.querySelector(".leaflet-container");
+    if (!mapEl) return;
+
+    const canvas = await html2canvas(mapEl, { useCORS: true });
+    const imgData = canvas.toDataURL("image/png");
+    const bounds = mapRef.current.getBounds();
+    const timestamp = new Date().toLocaleString();
+
+    const doc = (
+      <MapPDFDocument imgData={imgData} bounds={bounds} timestamp={timestamp} />
+    );
+    const blob = await pdf(doc).toBlob();
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `sugarcane_map_${Date.now()}.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="flex h-screen">
@@ -346,11 +404,9 @@ const CheckHarvest = () => {
             minZoom={6}
             maxZoom={24}
             scrollWheelZoom={true}
+            className="z-0"
           >
-            <TileLayer
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              attribution="&copy; OpenStreetMap contributors"
-            />
+            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
             <MapBoundsAdjuster />
             <PixelCanvasLayer
               data={locations}
@@ -358,6 +414,12 @@ const CheckHarvest = () => {
             />
           </MapContainer>
         )}
+        <button
+          onClick={handleGenerateAndDownloadPDF}
+          className="absolute top-6 right-6 bg-emerald-600 text-white px-4 py-2 rounded-lg z-50 hover:bg-emerald-700"
+        >
+          Download PDF
+        </button>
       </div>
     </div>
   );
