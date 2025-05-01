@@ -4,6 +4,8 @@ import L from "leaflet";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
 import html2canvas from "html2canvas";
+import { XCircle } from "lucide-react";
+
 import {
   pdf,
   Document,
@@ -239,6 +241,7 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
 const CheckHarvest = () => {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [loadingMsg, setLoadingMsg] = useState("Initializing map...");
   const [selectedStages, setSelectedStages] = useState({
     Germination: true,
@@ -287,7 +290,7 @@ const CheckHarvest = () => {
         })
         .catch((err) => {
           console.error("Error loading data:", err);
-          setLoading(false);
+          setError(true);
         });
     }
   }, []);
@@ -477,8 +480,8 @@ const CheckHarvest = () => {
   };
 
   return (
-    <div className="flex h-screen">
-      <div className="bg-green-50 w-1/4 p-6 overflow-y-auto border-r">
+    <div className="flex flex-col lg:flex-row gap-6 p-6 lg:p-12">
+      <div className="lg:w-1/4">
         <Legend
           onSearch={searchLocation}
           selectedStages={selectedStages}
@@ -488,7 +491,7 @@ const CheckHarvest = () => {
 
       <div className="w-3/4 relative z-0">
         {loading ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white bg-opacity-80 z-10">
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white rounded-xl shadow bg-opacity-80 z-10">
             <FontAwesomeIcon
               icon={faSpinner}
               spin
@@ -499,31 +502,44 @@ const CheckHarvest = () => {
             </p>
           </div>
         ) : (
-          <MapContainer
-            ref={mapRef}
-            style={{ height: "100vh", width: "100%" }}
-            bounds={PH_BOUNDS}
-            maxBounds={PH_BOUNDS}
-            zoom={7}
-            minZoom={6}
-            maxZoom={24}
-            scrollWheelZoom={true}
-            className="z-0"
-          >
-            <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-            <MapBoundsAdjuster />
-            <PixelCanvasLayer
-              data={locations}
-              selectedStages={selectedStages}
-            />
-          </MapContainer>
+          <div className="relative w-full h-full bg-white rounded-xl shadow">
+            <MapContainer
+              ref={mapRef}
+              style={{ height: "100vh", width: "100%" }}
+              bounds={PH_BOUNDS}
+              maxBounds={PH_BOUNDS}
+              zoom={7}
+              minZoom={6}
+              maxZoom={24}
+              scrollWheelZoom={true}
+              className="z-0"
+            >
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <MapBoundsAdjuster />
+              <PixelCanvasLayer
+                data={locations}
+                selectedStages={selectedStages}
+              />
+            </MapContainer>
+            <button
+              onClick={handleGenerateAndDownloadPDF}
+              className="absolute top-6 right-6 bg-emerald-600 text-white px-4 py-2 rounded-lg z-50 hover:bg-emerald-700"
+            >
+              Download PDF
+            </button>
+          </div>
         )}
-        <button
-          onClick={handleGenerateAndDownloadPDF}
-          className="absolute top-6 right-6 bg-emerald-600 text-white px-4 py-2 rounded-lg z-50 hover:bg-emerald-700"
-        >
-          Download PDF
-        </button>
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center bg-white z-[1000]">
+            <div className="text-center">
+              <XCircle className="mx-auto text-red-500 w-12 h-12" />
+              <p className="text-lg font-medium text-red-600 text-center pt-6 px-6">
+                Failed to load sugarcane data.
+              </p>
+              <p className="text-gray-500">Please reload the page.</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
