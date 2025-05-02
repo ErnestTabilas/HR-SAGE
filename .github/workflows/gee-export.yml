@@ -12,35 +12,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 2.1: check out your repo
+      # Step 1: Check out your repo
       - uses: actions/checkout@v3
 
-      # Step 2.2: set up Python
+      # Step 2: Set up Python
       - uses: actions/setup-python@v4
         with:
           python-version: "3.9"
 
-      # Step 2.3: install dependencies
+      # Step 3: Install Python dependencies
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
           pip install earthengine-api google-auth google-api-python-client
 
-      # Step 2.4: write your service-account.json from the secret
-      - name: Decode service account JSON
-        run: |
-          echo "${{ secrets.GCP_SA_JSON }}" > ${GITHUB_WORKSPACE}/sa.json
+      # Step 4: Write service account key to sa.json (correctly quoted)
+      - name: Write service account JSON
+        run: echo '${{ secrets.GOOGLE_DRIVE_CREDENTIALS_JSON }}' > sa.json
 
-      # Step 2.5: authenticate Earth Engine
+      # Step 5: Authenticate and initialize Earth Engine
       - name: Set up Earth Engine
-        run: |
-          echo "${{ secrets.GOOGLE_DRIVE_CREDENTIALS_JSON }}" > sa.json
-          python backend/gee_export.py
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: sa.json
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
+        run: |
+          python backend/gee_export.py
 
-      # Step 2.6: run your export script
-      - name: Trigger GEE export
+      # Step 6: Run update script to process/export and update Sheet
+      - name: Trigger GEE export and update sheet
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
         run: |
