@@ -32,12 +32,12 @@ jobs:
           echo "${{ secrets.GCP_SA_JSON }}" > ${GITHUB_WORKSPACE}/sa.json
 
       # Step 2.5: authenticate Earth Engine
-      - name: Authenticate Earth Engine
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
+      - name: Set up Earth Engine
         run: |
-          # this will use sa.json for ee.Initialize()
-          ee-authenticate --quiet
+          echo "${{ secrets.GOOGLE_DRIVE_CREDENTIALS_JSON }}" > sa.json
+          python script.py
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: sa.json
 
       # Step 2.6: run your export script
       - name: Trigger GEE export
