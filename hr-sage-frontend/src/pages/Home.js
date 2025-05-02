@@ -19,7 +19,7 @@ const Home = () => {
         showThumbs={false}
         showStatus={false}
         swipeable={false}
-        interval={7000}
+        interval={6000}
         animationHandler="fade"
         className="absolute top-0 left-0 w-full h-full z-0"
       >

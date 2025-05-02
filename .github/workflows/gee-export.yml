@@ -1,0 +1,47 @@
+name: GEE Export Every 5 Days
+
+# 1) schedule: runs every 5 days at midnight UTC
+# 2) workflow_dispatch: allows manual trigger from Actions tab
+on:
+  schedule:
+    - cron: "0 0 */5 * *"
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 2.1: check out your repo
+      - uses: actions/checkout@v3
+
+      # Step 2.2: set up Python
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      # Step 2.3: install dependencies
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install earthengine-api google-auth google-api-python-client
+
+      # Step 2.4: write your service-account.json from the secret
+      - name: Decode service account JSON
+        run: |
+          echo "${{ secrets.GCP_SA_JSON }}" > ${GITHUB_WORKSPACE}/sa.json
+
+      # Step 2.5: authenticate Earth Engine
+      - name: Authenticate Earth Engine
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
+        run: |
+          # this will use sa.json for ee.Initialize()
+          ee-authenticate --quiet
+
+      # Step 2.6: run your export script
+      - name: Trigger GEE export
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
+        run: |
+          python backend/scripts/trigger_gee_and_update_sheet.py
