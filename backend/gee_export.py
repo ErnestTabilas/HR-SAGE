@@ -1,6 +1,9 @@
 import os
 import ee
 import google.auth
+import logging
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 # Authenticate Earth Engine with service account
 service_account_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
@@ -12,6 +15,7 @@ credentials, _ = google.auth.load_credentials_from_file(
     ]
 )
 ee.Initialize(credentials)
+drive_service = build('drive', 'v3', credentials=credentials)
 
 # Load GEDI-Sentinel sugarcane dataset
 collection = ee.ImageCollection('projects/lobell-lab/gedi_sugarcane/maps/imgColl_10m_ESAESRIGLAD')
@@ -23,6 +27,30 @@ ph_tiles = collection.filter(ee.Filter.eq('country', 'philippines'))
 s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED') \
     .filterDate('2024-01-01', '2024-12-31') \
     .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20))
+
+def delete_old_exports(prefix):
+    try:
+        logging.info(f"Searching for existing files with prefix '{prefix}'...")
+        query = f"name contains '{prefix}' and mimeType='text/csv'"
+        response = drive_service.files().list(q=query).execute()
+
+        files = response.get('files', [])
+        if not files:
+            logging.info("No matching files found.")
+            return
+
+        for f in files:
+            file_id = f['id']
+            file_name = f['name']
+            try:
+                drive_service.files().delete(fileId=file_id).execute()
+                logging.info(f"Deleted file: {file_name}")
+            except HttpError as del_err:
+                logging.error(f"Failed to delete {file_name}: {del_err}")
+    except HttpError as err:
+        logging.error(f"Drive API error: {err}")
+
+delete_old_exports("tile_")
 
 # Function to classify growth stage
 def classify_growth_stage(n_tall, ndvi):
