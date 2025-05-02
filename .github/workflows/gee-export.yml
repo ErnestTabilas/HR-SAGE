@@ -35,7 +35,7 @@ jobs:
       - name: Set up Earth Engine
         run: |
           echo "${{ secrets.GOOGLE_DRIVE_CREDENTIALS_JSON }}" > sa.json
-          python script.py
+          python backend/gee_export.py
         env:
           GOOGLE_APPLICATION_CREDENTIALS: sa.json
 
@@ -44,4 +44,4 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
         run: |
-          python backend/scripts/trigger_gee_and_update_sheet.py
+          python backend/update_sheet.py
