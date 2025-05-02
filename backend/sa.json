@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "ee-eltabilas",
+  "private_key_id": "6f0d787d60ceae9262d2509e72bc962c6df46d92",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCfi7CYlR25yGcL\n9KEsX0y4ujHMCd9k8R9WplnQYkON8jK9hD+Y86/bH9mD+G4126ZwovA9eLKk8eHJ\n7bRBqqPMLFlZfnOAmdAR+oMKvlFWKCBE7AZRiRM5cS4QYqA+tmQZwlBmrjoJUIdF\nwzFKQ0j/bw/vQtKnsUl4v1iycdwCabSvPQ65KDfG7gMHDMDaZhjntQOazZjkPFhx\nn9AJLzPTb4UbMVvQPhPJaeaBHCA/9C4br+LCO8reVFvlEPfF2er15oURmLOxY7xy\n3rqylK4ezefSEFqz5ye5PzxeZiomqK88e00nmMAvSWFqh+HxMJolNIEaQWS15VUq\nGXPjWen5AgMBAAECggEAAPU8QrZGfuqSn9JAs30A/2zyxphalIcUGpeWG3ezkyMc\npeGo5hi0ehrXWgEAXGdsuOlpitzyKaZgJi+8sNY+9Idho/Vr6R5DTxBTgBmDcIJ+\nKxvFr/CkQmiJD8Uf1DCRKkxt4ifypkKrBUK2RY1g31PB4zxh+mrIl6aCeFPRr9wD\nMOTLGE4Uq4Z4lAiQKCsRr/F8atMc5DWwbs+nz1ZiIuBzXdtek2wqQHAtdzb90kdL\nLYSgeKaO5L0+luPJCSHSrB6lVeCM5hxc14b2aRua/Q9gPApB3XJb889Ax50irUJC\nh2j3Ewbb8EOygfLs4r/efDxMrf3QqnWvdC1QQgZUTwKBgQDWFaZCWD991e8FgwxX\nvtUO0Z79C4TQnSvNxGEdp32rNez7I3kJaP7SvWzyecYtZfDcn7Ou6ZUD+LFgWDzb\nkewde0nAI+ybYxd/1EUfbWmcB78XvrTvLU+M+M7/IgXy29Rtm4bzHsb1OJQoJ+9D\nxR7WWn1A9eL4Rcg8B5P2koTbdwKBgQC+yHC/TZpZQzOeh3zfCTQaBGhp5SPianfj\nzgqSghiqmeAQHFLgXQGpZXzaZqwgN0uPaT7knw6DsdOPywon94SJiBFAMmHADGt+\nuWaTvioIOU0TduZg+9/iNG6N/k0pDGpZ6iXOKrFJa2WtSsWdaGgjW5uoC1NC8qZs\n0qcJSz7iDwKBgApmot02TF9gtWwfIcphixhdNsw0cw9vk2E72TwHlyNqS0koQAkl\nALxcV56wK+Cowzr0x1YIIyU+P9/eaZaBUGdeRgb/t88U0V90gKc2OZtLBQ2yRjgY\ni3Td4bCjhoZ2B6wLklLde+0OAqSwy/8O5KClZNBzIcPOIBxKgfXIyIuhAoGAMIEZ\nWSnLsiIJv6ZGsxXN70drnHCrXOcgsAQ0X+c/ijAw7SemUnCS+ZRZ19T+sfoc9csW\nOF3P/N97IDXI0Tx2r9iuOhoVDBScR82vLKTOXuTima5DCClBVGtsKCGdUHBdoZqM\nHgxwom/xm8tEzq46u7KQsnqeooi6kzRDT3OX+zUCgYEA1LtkMmpoZAewQibRmTP4\nsojz9c9eprgPqqNLrmjLbg7vqi2781mLSbBYOtfTypB7WWBLA06tatkEI9+rvFxj\nGkt1l2mo1VytE6vG5u7whALLk9NBYmIdItYwBSlIpNmo67ieydZATvHlDWb+WTYF\nC57vAmNcAdgpvSgkVQbdvjI=\n-----END PRIVATE KEY-----\n",
+  "client_email": "hr-sage-service-account@ee-eltabilas.iam.gserviceaccount.com",
+  "client_id": "110073523711575682975",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/hr-sage-service-account%40ee-eltabilas.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
