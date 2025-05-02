@@ -2,13 +2,15 @@ import os
 import ee
 import google.auth
 
-# Initialize Earth Engine
+# Authenticate Earth Engine with service account
 service_account_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
-
-credentials, _ = google.auth.load_credentials_from_file(service_account_path, scopes=[
-    'https://www.googleapis.com/auth/earthengine',
-    'https://www.googleapis.com/auth/cloud-platform'
-])
+credentials, _ = google.auth.load_credentials_from_file(
+    service_account_path,
+    scopes=[
+        'https://www.googleapis.com/auth/earthengine',
+        'https://www.googleapis.com/auth/cloud-platform'
+    ]
+)
 ee.Initialize(credentials)
 
 # Load GEDI-Sentinel sugarcane dataset
@@ -50,14 +52,17 @@ for idx, tile_id in enumerate(tile_ids):
     tile_number = idx + 1
     tile_image = ee.Image(tile_id)
 
+    # Create combined crop mask
     esa = tile_image.select('ESA').eq(1).unmask(0)
     esri = tile_image.select('ESRI').eq(1).unmask(0)
     glad = tile_image.select('GLAD').eq(1).unmask(0)
     combined_mask = esa.Or(esri).Or(glad)
 
+    # Mask sugarcane band and add as new band
     sugarcane = tile_image.select('sugarcane').eq(1).updateMask(combined_mask)
     masked_tile = tile_image.addBands(sugarcane.rename('sugarcane_mask'))
 
+    # Vectorize sugarcane pixels to centroids
     vectors = masked_tile.select('sugarcane_mask').selfMask().reduceToVectors(
         geometryType='centroid',
         reducer=ee.Reducer.countEvery(),
@@ -65,6 +70,7 @@ for idx, tile_id in enumerate(tile_ids):
         maxPixels=1e9
     )
 
+    # Annotate each feature with properties
     def annotate_feature(feature):
         coords = feature.geometry().coordinates()
         lat = coords.get(1)
@@ -103,16 +109,14 @@ for idx, tile_id in enumerate(tile_ids):
 
     annotated = vectors.map(annotate_feature)
 
-    count = annotated.size().getInfo()
-    if count > 0:
-        print(f'Exporting tile {tile_number} with {count} points.')
-        task = ee.batch.Export.table.toDrive(
-            collection=annotated,
-            description=f'ndvi_tile_{tile_number}',
-            fileNamePrefix=f'tile_{tile_number}',
-            fileFormat='CSV',
-            selectors=['lat', 'lng', 'n_tallmonths', 'ndvi', 'growth_stage']
-        )
-        task.start()
-    else:
-        print(f'Skipping tile {tile_number} (no sugarcane points detected).')
+    # Export annotated features directly to Drive (no client-side getInfo)
+    print(f'Starting export for tile {tile_number}...')
+    task = ee.batch.Export.table.toDrive(
+        collection=annotated,
+        description=f'ndvi_tile_{tile_number}',
+        fileNamePrefix=f'tile_{tile_number}',
+        fileFormat='CSV',
+        selectors=['lat', 'lng', 'n_tallmonths', 'ndvi', 'growth_stage']
+    )
+    task.start()
+    print(f'Task started for tile {tile_number}.')
