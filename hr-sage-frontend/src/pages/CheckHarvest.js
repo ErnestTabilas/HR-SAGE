@@ -248,17 +248,14 @@ const CheckHarvest = () => {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
+  const [readableDate, setReadableDate] = useState(null);
   const [loadingMsg, setLoadingMsg] = useState("Initializing map...");
   const [selectedStages, setSelectedStages] = useState({
     Germination: true,
     Tillering: true,
     "Grand Growth": true,
     Ripening: true,
-  });
-  const [pdfData, setPdfData] = useState({
-    imgData: null,
-    bounds: null,
-    timestamp: null,
   });
 
   const mapRef = useRef();
@@ -271,6 +268,20 @@ const CheckHarvest = () => {
     "🌾 Ripening (NDVI 0.3–0.5): Ready for harvest soon.",
     "🗓️ Data updates every 5 days.",
   ];
+
+  const lastDate = new Date(lastUpdated); // 'lastUpdate' is in 'yyyy-mm-dd'
+  const now = new Date();
+
+  // Strip time to compare pure date values
+  lastDate.setHours(0, 0, 0, 0);
+  now.setHours(0, 0, 0, 0);
+
+  // Calculate days since last update
+  const diffInMs = now - lastDate;
+  const daysSinceUpdate = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+  // Days remaining until next 5-day cycle
+  const daysRemaining = 5 - (daysSinceUpdate % 5 || 5); // returns 5 if 0
 
   useEffect(() => {
     let idx = 0;
@@ -299,6 +310,18 @@ const CheckHarvest = () => {
           setError(true);
         });
     }
+  }, []);
+
+  useEffect(() => {
+    fetch("http://127.0.0.1:5000/api/last-update")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.last_updated) {
+          setLastUpdated(data.last_updated);
+          setReadableDate(data.readable);
+        }
+      })
+      .catch((err) => console.error("Failed to fetch last update:", err));
   }, []);
 
   const searchLocation = async (q) => {
@@ -533,6 +556,10 @@ const CheckHarvest = () => {
             >
               Download PDF
             </button>
+            <div className="absolute top-6 left-14 text-xs text-gray-600 bg-white px-3 py-1 rounded shadow z-50">
+              📅 Last Updated at: {lastUpdated}, Next update after{" "}
+              {daysRemaining} days
+            </div>
           </div>
         )}
         {error && (

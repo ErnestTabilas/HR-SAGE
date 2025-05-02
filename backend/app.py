@@ -3,11 +3,21 @@ import logging
 from flask import Flask, jsonify
 from flask_cors import CORS
 from supabase import create_client, Client
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+from datetime import datetime
 
 # ---- Setup ----
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 CORS(app)
+
+current_dir = os.path.dirname(os.path.abspath(__file__))
+SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
+SCOPES = [
+    "https://www.googleapis.com/auth/drive.readonly"
+]
+FOLDER_ID = "1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK"  # Google Drive folder ID
 
 # ---- Supabase Config ----
 PAGE_SIZE = 10000  # Define how many rows to fetch per request
@@ -70,5 +80,44 @@ def sugarcane_locations():
         logging.error(f"Error during data fetching: {e}")
         return jsonify({"error": "Error fetching sugarcane locations"}), 500
 
+def get_latest_csv_modified_date():
+    credentials = service_account.Credentials.from_service_account_file(
+        SERVICE_ACCOUNT_FILE, scopes=SCOPES
+    )
+
+    service = build('drive', 'v3', credentials=credentials)
+
+    # Query CSV files in the specified folder
+    query = f"'{FOLDER_ID}' in parents and mimeType='text/csv' and trashed=false"
+    results = service.files().list(
+        q=query,
+        pageSize=100,
+        fields="files(id, name, modifiedTime)"
+    ).execute()
+
+    files = results.get('files', [])
+
+    if not files:
+        return None
+
+    # Get the most recently modified file
+    latest_file = max(files, key=lambda x: x['modifiedTime'])
+    latest_date = latest_file['modifiedTime'][:10]  # "YYYY-MM-DD"
+
+    return latest_date
+
+@app.route('/api/last-update', methods=["GET"])
+def last_update():
+    try:
+        last_updated = get_latest_csv_modified_date()
+        if not last_updated:
+            return jsonify({"error": "No CSV files found"}), 404
+        readable_date = datetime.strptime(last_updated, "%Y-%m-%d").strftime("%B %d, %Y")
+        logging.info("Successfully fetched last updated data time.")
+        return jsonify({"last_updated": last_updated, "readable": readable_date})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
 if __name__ == "__main__":
     app.run(debug=True)
+    
