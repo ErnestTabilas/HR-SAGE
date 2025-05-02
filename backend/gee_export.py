@@ -1,7 +1,15 @@
+import os
 import ee
+import google.auth
 
 # Initialize Earth Engine
-ee.Initialize()
+service_account_path = os.getenv('GOOGLE_APPLICATION_CREDENTIALS')
+
+credentials, _ = google.auth.load_credentials_from_file(service_account_path, scopes=[
+    'https://www.googleapis.com/auth/earthengine',
+    'https://www.googleapis.com/auth/cloud-platform'
+])
+ee.Initialize(credentials)
 
 # Load GEDI-Sentinel sugarcane dataset
 collection = ee.ImageCollection('projects/lobell-lab/gedi_sugarcane/maps/imgColl_10m_ESAESRIGLAD')
