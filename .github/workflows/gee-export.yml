@@ -11,6 +11,10 @@ jobs:
   export:
     runs-on: ubuntu-latest
 
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
     steps:
       # Step 1: Check out your repo
       - uses: actions/checkout@v3
