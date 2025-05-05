@@ -265,7 +265,6 @@ function TileLayerSwitcher({ selectedLayer }) {
 
   return (
     <TileLayer
-      key={selectedLayer}
       url={tileLayers[selectedLayer].url}
       attribution={tileLayers[selectedLayer].attribution}
     />
