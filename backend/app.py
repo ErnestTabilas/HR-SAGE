@@ -36,7 +36,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 def fetch_sugarcane_data_from_supabase():
     try:
         all_data = []
-        page_size = 500000  # Number of rows per page, adjust based on your needs
+        page_size = 100000  # Number of rows per page, adjust based on your needs
         offset = 0  # Starting point for pagination
 
         while True:

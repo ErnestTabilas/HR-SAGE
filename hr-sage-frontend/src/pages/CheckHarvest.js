@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { MapContainer, TileLayer, useMap, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, useMap, Popup, Marker } from "react-leaflet";
 import L from "leaflet";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
@@ -35,6 +35,21 @@ const getColor = (stage) => {
     default:
       return "#9ca3af";
   }
+};
+
+const tileLayers = {
+  street: {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: "&copy; OpenStreetMap contributors",
+  },
+  terrain: {
+    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+    attribution: "&copy; OpenTopoMap contributors",
+  },
+  topographic: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+    attribution: "&copy; Esri, FAO, NOAA, USGS, U.S. Navy, NGA, GEBCO, GIBS",
+  },
 };
 
 const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
@@ -150,13 +165,11 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
             d.lat > bounds.getSouth() &&
             d.lng > bounds.getWest() &&
             d.lng < bounds.getEast() &&
-            selectedStages[d.growth_stage.trim()]
+            selectedStages[d.growth_stage?.trim()]
           );
         });
 
         const zoom = coords.z;
-
-        // Dynamic radius: base radius 0.1 at zoom level 7, doubling each zoom level
         const baseZoom = 7;
         const radius = 0.1 * Math.pow(2, zoom - baseZoom);
 
@@ -186,7 +199,7 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
       let closestPoint = null;
 
       data.forEach((d) => {
-        if (!selectedStages[d.growth_stage]) return;
+        if (!selectedStages[d.growth_stage?.trim()]) return;
 
         const dataPoint = map.project([d.lat, d.lng], map.getZoom());
         const dist = clickPoint.distanceTo(dataPoint);
@@ -205,14 +218,17 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
         const today = new Date();
         let estimatedHarvest = new Date(today);
 
-        if (stage === "Ripening") estimatedHarvest = today;
-        else if (stage === "Grand Growth")
+        if (stage === "Ripening") {
+          // already ready
+        } else if (stage === "Grand Growth") {
           estimatedHarvest.setMonth(today.getMonth() + 4);
-        else if (stage === "Tillering")
+        } else if (stage === "Tillering") {
           estimatedHarvest.setMonth(today.getMonth() + 8);
-        else if (stage === "Emergence")
+        } else if (stage === "Emergence") {
           estimatedHarvest.setMonth(today.getMonth() + 11);
-        else estimatedHarvest.setMonth(today.getMonth() + 13);
+        } else {
+          estimatedHarvest.setMonth(today.getMonth() + 13);
+        }
 
         const estimatedDate = estimatedHarvest.toISOString().split("T")[0];
 
@@ -244,12 +260,25 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
   return null;
 };
 
+function TileLayerSwitcher({ selectedLayer }) {
+  const map = useMap();
+
+  return (
+    <TileLayer
+      key={selectedLayer}
+      url={tileLayers[selectedLayer].url}
+      attribution={tileLayers[selectedLayer].attribution}
+    />
+  );
+}
+
 const CheckHarvest = () => {
   const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [readableDate, setReadableDate] = useState(null);
+  const [basemap, setBasemap] = useState("street");
   const [loadingMsg, setLoadingMsg] = useState("Initializing map...");
   const [selectedStages, setSelectedStages] = useState({
     Germination: true,
@@ -543,19 +572,31 @@ const CheckHarvest = () => {
               scrollWheelZoom={true}
               className="z-0"
             >
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <MapBoundsAdjuster />
               <PixelCanvasLayer
                 data={locations}
                 selectedStages={selectedStages}
               />
+              <TileLayerSwitcher selectedLayer={basemap} />
+              <MapBoundsAdjuster />
             </MapContainer>
             <button
               onClick={handleGenerateAndDownloadPDF}
-              className="absolute top-6 right-6 bg-emerald-600 text-white px-4 py-2 rounded-lg z-50 hover:bg-emerald-700"
+              className="absolute top-16 right-6 bg-emerald-600 text-white px-4 py-2 rounded-lg z-50 hover:bg-emerald-700"
             >
               Download PDF
             </button>
+            <div className="absolute top-4 right-4 bg-white p-1 w-45 rounded shadow z-[999]">
+              <label>Base Map:</label>
+              <select
+                className="ml-1 border"
+                value={basemap}
+                onChange={(e) => setBasemap(e.target.value)}
+              >
+                <option value="street">Street</option>
+                <option value="terrain">Terrain</option>
+                <option value="topographic">Topographic</option>
+              </select>
+            </div>
             <div className="absolute top-6 left-14 text-xs text-gray-600 bg-white px-3 py-1 rounded shadow z-50">
               📅 Last Updated at: {lastUpdated}, Next update after{" "}
               {daysRemaining} days
