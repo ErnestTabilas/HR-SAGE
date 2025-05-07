@@ -355,17 +355,77 @@ const CheckHarvest = () => {
   const searchLocation = async (q) => {
     try {
       const r = await axios.get("https://nominatim.openstreetmap.org/search", {
-        params: { q, format: "json", countrycodes: "PH", limit: 1 },
+        params: {
+          q,
+          format: "json",
+          countrycodes: "PH",
+          limit: 1,
+          addressdetails: 1,
+        },
       });
+
       if (r.data[0]) {
-        const { lat, lon } = r.data[0];
-        mapRef.current.setView([+lat, +lon], 15);
+        const { lat, lon, boundingbox, display_name } = r.data[0];
+
+        // Extract the bounding box: [minLat, maxLat, minLon, maxLon]
+        const [minLat, maxLat, minLon, maxLon] = boundingbox;
+
+        // Adjust the map view to the search location
+        mapRef.current.setView([+lat, +lon], 12); // Adjust zoom level as needed
+
+        // Create a polygon from the bounding box to represent the searched area
+        const bounds = [
+          [minLat, minLon], // Bottom-left corner
+          [minLat, maxLon], // Bottom-right corner
+          [maxLat, maxLon], // Top-right corner
+          [maxLat, minLon], // Top-left corner
+        ];
+
+        const polygon = L.polygon(bounds, {
+          color: "yellow",
+          fillColor: "yellow",
+          fillOpacity: 0.3,
+          weight: 0,
+        }).addTo(mapRef.current);
+
+        // Find the number of sugarcane points in the area (example function below)
+        const sugarcaneCount = await getSugarcaneCountInBounds(
+          minLat,
+          maxLat,
+          minLon,
+          maxLon
+        );
+
+        // Show a popup with sugarcane count at the center of the area
+        const popup = L.popup()
+          .setLatLng([lat, lon])
+          .setContent(
+            `Location: ${display_name}<br>Sugarcane points found: ${sugarcaneCount}`
+          )
+          .openOn(mapRef.current);
+
+        // Automatically close the popup after 5 seconds
+        setTimeout(() => {
+          mapRef.current.closePopup(popup);
+        }, 5000);
       } else {
         alert("Location not found.");
       }
     } catch (e) {
       console.error(e);
     }
+  };
+
+  // Example function to get the sugarcane count in the area
+  const getSugarcaneCountInBounds = async (minLat, maxLat, minLon, maxLon) => {
+    // Implement the logic to query your backend or dataset for sugarcane points within the bounding box
+    // Example (replace with actual data fetching code):
+    // const sugarcaneData = await axios.get("YOUR_API_URL", {
+    //   params: { minLat, maxLat, minLon, maxLon },
+    // });
+
+    // return sugarcaneData.data.count || 0; // Assuming API returns a count of sugarcane points
+    return 1; // Placeholder value for the number of sugarcane points
   };
 
   const toggleStage = (stage) =>
@@ -580,25 +640,20 @@ const CheckHarvest = () => {
             </MapContainer>
             <button
               onClick={handleGenerateAndDownloadPDF}
-              className="absolute top-16 right-6 bg-emerald-600 text-white px-4 py-2 rounded-lg z-50 hover:bg-emerald-700"
+              className="absolute top-4 right-24 bg-emerald-600 text-white px-4 py-2 rounded-lg z-50 hover:bg-emerald-700"
             >
               Download PDF
             </button>
-            <div className="absolute top-4 right-4 bg-white p-1 w-45 rounded shadow z-[999]">
-              <label>Base Map:</label>
+            <div className="absolute top-4 right-4 bg-white p-1 w-45 rounded shadow z-[999] text-gray-600">
               <select
-                className="ml-1 border"
+                className="ml-1 border px-2 py-1 rounded"
                 value={basemap}
                 onChange={(e) => setBasemap(e.target.value)}
               >
-                <option value="street">Street</option>
-                <option value="terrain">Terrain</option>
-                <option value="topographic">Topographic</option>
+                <option value="street">🚗</option>
+                <option value="terrain">🏔️</option>
+                <option value="topographic">🗺️</option>
               </select>
-            </div>
-            <div className="absolute top-6 left-14 text-xs text-gray-600 bg-white px-3 py-1 rounded shadow z-50">
-              📅 Last Updated at: {lastUpdated}, Next update after{" "}
-              {daysRemaining} days
             </div>
           </div>
         )}
