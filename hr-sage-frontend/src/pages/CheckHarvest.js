@@ -191,6 +191,7 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
         tile.width = 256;
         tile.height = 256;
         const ctx = tile.getContext("2d");
+        ctx.imageSmoothingEnabled = false; // Ensures sharp rendering like GEE
 
         const bounds = this._tileCoordsToBounds(coords);
         const pointsInTile = data.filter((d) => {
@@ -210,8 +211,8 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
         pointsInTile.forEach((d) => {
           const latlngPoint = map.project([d.lat, d.lng], coords.z);
           const tileOrigin = map.project(bounds.getNorthWest(), coords.z);
-          const x = latlngPoint.x - tileOrigin.x;
-          const y = latlngPoint.y - tileOrigin.y;
+          const x = Math.round(latlngPoint.x - tileOrigin.x);
+          const y = Math.round(latlngPoint.y - tileOrigin.y);
 
           ctx.beginPath();
           ctx.arc(x, y, radius, 0, 2 * Math.PI, false);

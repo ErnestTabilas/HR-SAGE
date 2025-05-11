@@ -11,10 +11,6 @@ jobs:
   export:
     runs-on: ubuntu-latest
 
-    env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-
     steps:
       # Step 1: Check out your repo
       - uses: actions/checkout@v3
@@ -41,9 +37,11 @@ jobs:
         run: |
           python backend/gee_export.py
 
-      # Step 6: Run update script to merge CSVs into Sheet
+      # Step 6: Run update script to merge CSVs into Sheet and push to Supabase
       - name: Trigger update_sheet script
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           python backend/update_sheet.py
