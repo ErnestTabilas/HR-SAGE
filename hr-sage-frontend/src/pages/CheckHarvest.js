@@ -45,19 +45,6 @@ const getColor = (stage) => {
   }
 };
 
-const getPixelPolygon = (lat, lng, resolution = 10) => {
-  const latOffset = resolution / 111320 / 2; // degrees latitude per meter
-  const lngOffset =
-    resolution / ((40075000 * Math.cos((lat * Math.PI) / 180)) / 360) / 2;
-
-  return [
-    [lat - latOffset, lng - lngOffset],
-    [lat - latOffset, lng + lngOffset],
-    [lat + latOffset, lng + lngOffset],
-    [lat + latOffset, lng - lngOffset],
-  ];
-};
-
 const tileLayers = {
   street: {
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -163,18 +150,6 @@ const MapBoundsAdjuster = () => {
   return null;
 };
 
-const getBoundsAround = (latlng, sizeMeters = 10) => {
-  const lat = latlng.lat;
-  const lng = latlng.lng;
-  const dLat = sizeMeters / 111320;
-  const dLng =
-    sizeMeters / ((40075000 * Math.cos((lat * Math.PI) / 180)) / 360);
-  return [
-    [lat - dLat / 2, lng - dLng / 2],
-    [lat + dLat / 2, lng + dLng / 2],
-  ];
-};
-
 const PixelCanvasLayer = ({ data = [], selectedStages }) => {
   const map = useMap();
   const layerRef = useRef();
@@ -206,7 +181,7 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
 
         const zoom = coords.z;
         const baseZoom = 7;
-        const radius = 0.1 * Math.pow(2, zoom - baseZoom);
+        const radius = 0.15 * Math.pow(2, zoom - baseZoom);
 
         pointsInTile.forEach((d) => {
           const latlngPoint = map.project([d.lat, d.lng], coords.z);

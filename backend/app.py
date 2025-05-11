@@ -40,24 +40,25 @@ def fetch_sugarcane_data_from_supabase():
         offset = 0  # Starting point for pagination
 
         while True:
-            # Fetch the next page of data
+            # Fetch the next page of data with filtering
             response = supabase\
                 .table(TABLE_NAME)\
                 .select("*")\
+                .neq("growth_stage", "No Sugarcane")\
+                .gt("ndvi", 0)\
+                .gt("n_tallmonths", 0)\
                 .range(offset, offset + page_size - 1)\
                 .execute()
             
             # Check if the response contains data
             if response.data:
-                all_data.extend(response.data)  # Add this page's data to the overall list
-                logging.info(f"Fetched {len(response.data)} rows, total: {len(all_data)}.")
+                all_data.extend(response.data)
+                logging.info(f"Fetched {len(response.data)} filtered rows, total: {len(all_data)}.")
                 
-                # If fewer rows than the page size are returned, we've reached the end
                 if len(response.data) < page_size:
-                    logging.info("End of data reached.")
+                    logging.info("End of filtered data reached.")
                     break
 
-                # Move to the next page
                 offset += page_size
             else:
                 logging.warning("No data returned for this page.")
@@ -66,9 +67,8 @@ def fetch_sugarcane_data_from_supabase():
         return all_data
     
     except Exception as e:
-        logging.error(f"Error fetching data from Supabase: {e}")
+        logging.error(f"Error fetching filtered data from Supabase: {e}")
         return []
-
 
 @app.route("/sugarcane-locations", methods=["GET"])
 def sugarcane_locations():
