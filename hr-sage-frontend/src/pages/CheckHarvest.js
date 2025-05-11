@@ -1,5 +1,13 @@
-import React, { useEffect, useState, useRef } from "react";
-import { MapContainer, TileLayer, useMap, Popup, Marker } from "react-leaflet";
+import React, { useEffect, useState, useRef, useMemo } from "react";
+import {
+  MapContainer,
+  TileLayer,
+  useMap,
+  Rectangle,
+  Popup,
+  Marker,
+  Polygon,
+} from "react-leaflet";
 import L from "leaflet";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
@@ -37,6 +45,19 @@ const getColor = (stage) => {
   }
 };
 
+const getPixelPolygon = (lat, lng, resolution = 10) => {
+  const latOffset = resolution / 111320 / 2; // degrees latitude per meter
+  const lngOffset =
+    resolution / ((40075000 * Math.cos((lat * Math.PI) / 180)) / 360) / 2;
+
+  return [
+    [lat - latOffset, lng - lngOffset],
+    [lat - latOffset, lng + lngOffset],
+    [lat + latOffset, lng + lngOffset],
+    [lat + latOffset, lng - lngOffset],
+  ];
+};
+
 const tileLayers = {
   street: {
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -54,6 +75,7 @@ const tileLayers = {
 
 const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   const [searchTerm, setSearchTerm] = useState("");
+
   const stageInfo = [
     { name: "Germination", color: "bg-red-500", range: "(0.1 - 0.2)" },
     { name: "Tillering", color: "bg-orange-500", range: "(0.2 - 0.4)" },
@@ -139,6 +161,18 @@ const MapBoundsAdjuster = () => {
     ]);
   }, [map]);
   return null;
+};
+
+const getBoundsAround = (latlng, sizeMeters = 10) => {
+  const lat = latlng.lat;
+  const lng = latlng.lng;
+  const dLat = sizeMeters / 111320;
+  const dLng =
+    sizeMeters / ((40075000 * Math.cos((lat * Math.PI) / 180)) / 360);
+  return [
+    [lat - dLat / 2, lng - dLng / 2],
+    [lat + dLat / 2, lng + dLng / 2],
+  ];
 };
 
 const PixelCanvasLayer = ({ data = [], selectedStages }) => {
@@ -278,6 +312,8 @@ const CheckHarvest = () => {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [readableDate, setReadableDate] = useState(null);
   const [basemap, setBasemap] = useState("street");
+  const [searchHighlight, setSearchHighlight] = useState(null);
+
   const [loadingMsg, setLoadingMsg] = useState("Initializing map...");
   const [selectedStages, setSelectedStages] = useState({
     Germination: true,
@@ -292,6 +328,7 @@ const CheckHarvest = () => {
     "💡 Tip: Click on sugarcane points to see details.",
     "🧭 Tip: Use the search bar to zoom.",
     "🔍 Tip: Toggle stages in the legend.",
+    "🧭 Tip: If the map fails to load within 3 mins. Reload the page.",
     "🌱 Germination (NDVI 0.1–0.2): Early growth.",
     "🌾 Ripening (NDVI 0.3–0.5): Ready for harvest soon.",
     "🗓️ Data updates every 5 days.",
@@ -352,80 +389,68 @@ const CheckHarvest = () => {
       .catch((err) => console.error("Failed to fetch last update:", err));
   }, []);
 
-  const searchLocation = async (q) => {
+  const searchLocation = async (query) => {
+    setLoadingMsg(`Searching for "${query}"...`);
+
     try {
-      const r = await axios.get("https://nominatim.openstreetmap.org/search", {
-        params: {
-          q,
-          format: "json",
-          countrycodes: "PH",
-          limit: 1,
-          addressdetails: 1,
-        },
-      });
+      const response = await axios.get(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          query
+        )}`
+      );
 
-      if (r.data[0]) {
-        const { lat, lon, boundingbox, display_name } = r.data[0];
+      if (response.data.length > 0) {
+        const result = response.data[0];
+        const lat = parseFloat(result.lat);
+        const lon = parseFloat(result.lon);
+        const map = mapRef.current;
+        if (map) {
+          map.flyTo([lat, lon], 13);
 
-        // Extract the bounding box: [minLat, maxLat, minLon, maxLon]
-        const [minLat, maxLat, minLon, maxLon] = boundingbox;
+          const bounds = [
+            [lat - 0.01, lon - 0.01],
+            [lat + 0.01, lon + 0.01],
+          ];
 
-        // Adjust the map view to the search location
-        mapRef.current.setView([+lat, +lon], 12); // Adjust zoom level as needed
+          // Filter sugarcane points in bounding box
+          const pointsInArea = locations.filter(
+            (p) =>
+              p.lat > bounds[0][0] &&
+              p.lat < bounds[1][0] &&
+              p.lng > bounds[0][1] &&
+              p.lng < bounds[1][1]
+          );
 
-        // Create a polygon from the bounding box to represent the searched area
-        const bounds = [
-          [minLat, minLon], // Bottom-left corner
-          [minLat, maxLon], // Bottom-right corner
-          [maxLat, maxLon], // Top-right corner
-          [maxLat, minLon], // Top-left corner
-        ];
+          // Show yellow transparent highlight and popup
+          const layer = L.rectangle(bounds, {
+            color: "yellow",
+            weight: 2,
+            fillOpacity: 0.25,
+          }).addTo(map);
 
-        const polygon = L.polygon(bounds, {
-          color: "yellow",
-          fillColor: "yellow",
-          fillOpacity: 0.3,
-          weight: 0,
-        }).addTo(mapRef.current);
+          const popup = L.popup()
+            .setLatLng([lat, lon])
+            .setContent(
+              `<strong>${pointsInArea.length}</strong> sugarcane points found nearby.`
+            )
+            .openOn(map);
 
-        // Find the number of sugarcane points in the area (example function below)
-        const sugarcaneCount = await getSugarcaneCountInBounds(
-          minLat,
-          maxLat,
-          minLon,
-          maxLon
-        );
+          setSearchHighlight({ layer, popup });
 
-        // Show a popup with sugarcane count at the center of the area
-        const popup = L.popup()
-          .setLatLng([lat, lon])
-          .setContent(
-            `Location: ${display_name}<br>Sugarcane points found: ${sugarcaneCount}`
-          )
-          .openOn(mapRef.current);
-
-        // Automatically close the popup after 5 seconds
-        setTimeout(() => {
-          mapRef.current.closePopup(popup);
-        }, 5000);
+          // Remove highlight after 5 seconds
+          setTimeout(() => {
+            map.removeLayer(layer);
+            map.closePopup(popup);
+            setSearchHighlight(null);
+          }, 5000);
+        }
       } else {
-        alert("Location not found.");
+        alert("No location found.");
       }
-    } catch (e) {
-      console.error(e);
+    } catch (err) {
+      console.error("Search failed:", err);
+      alert("Search failed. Please try again.");
     }
-  };
-
-  // Example function to get the sugarcane count in the area
-  const getSugarcaneCountInBounds = async (minLat, maxLat, minLon, maxLon) => {
-    // Implement the logic to query your backend or dataset for sugarcane points within the bounding box
-    // Example (replace with actual data fetching code):
-    // const sugarcaneData = await axios.get("YOUR_API_URL", {
-    //   params: { minLat, maxLat, minLon, maxLon },
-    // });
-
-    // return sugarcaneData.data.count || 0; // Assuming API returns a count of sugarcane points
-    return 1; // Placeholder value for the number of sugarcane points
   };
 
   const toggleStage = (stage) =>
@@ -635,6 +660,7 @@ const CheckHarvest = () => {
                 data={locations}
                 selectedStages={selectedStages}
               />
+
               <TileLayerSwitcher selectedLayer={basemap} />
               <MapBoundsAdjuster />
             </MapContainer>
