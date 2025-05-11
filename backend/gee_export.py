@@ -1,11 +1,9 @@
 import ee
 ee.Initialize()
 
-# 1. Load GEDI-Sentinel sugarcane tiles
 tiles = ee.ImageCollection("projects/lobell-lab/gedi_sugarcane/maps/imgColl_10m_ESAESRIGLAD") \
     .filterBounds(ee.Geometry.BBox(116.9, 4.6, 126.6, 21.3))
 
-# 2. Load Sentinel-2 NDVI composite for 2024
 start = '2024-01-01'
 end = '2024-12-31'
 
@@ -16,7 +14,6 @@ s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED") \
 
 ndvi_median = s2.select('NDVI').median()
 
-# 3. Function to export a tile safely
 def process_tile(tile_img, index):
     geom = tile_img.geometry()
     band_names = tile_img.bandNames()
@@ -37,8 +34,9 @@ def process_tile(tile_img, index):
         scale=10,
         projection='EPSG:4326',
         geometries=True,
-        seed=42
-    )
+        seed=42,
+        dropNulls=True
+    ).limit(5000)  # Limit the number of sampled points
 
     task = ee.batch.Export.table.toDrive(
         collection=points,
@@ -49,7 +47,6 @@ def process_tile(tile_img, index):
     task.start()
     print(f"Export task started for tile {index}")
 
-# 4. Get the list of tiles and run export
 tile_list = tiles.toList(tiles.size())
 num_tiles = tile_list.size().getInfo()
 
