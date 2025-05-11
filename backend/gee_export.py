@@ -1,54 +1,58 @@
 import ee
-
-# Initialize the Earth Engine API
 ee.Initialize()
 
-# 1. Load GEDI-Sentinel sugarcane tiles (Philippines only)
-gedi_tiles = ee.ImageCollection("projects/lobell-lab/gedi_sugarcane/maps/imgColl_10m_ESAESRIGLAD") \
-    .filterBounds(ee.Geometry.BBox(116.9, 4.6, 126.6, 21.3))  # Philippines
+# 1. Load GEDI-Sentinel sugarcane tiles
+tiles = ee.ImageCollection("projects/lobell-lab/gedi_sugarcane/maps/imgColl_10m_ESAESRIGLAD") \
+    .filterBounds(ee.Geometry.BBox(116.9, 4.6, 126.6, 21.3))
 
-# 2. Load Sentinel-2 NDVI composite (2024)
-start_date = '2024-01-01'
-end_date = '2024-12-31'
+# 2. Load Sentinel-2 NDVI composite for 2024
+start = '2024-01-01'
+end = '2024-12-31'
 
 s2 = ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED") \
-    .filterDate(start_date, end_date) \
+    .filterDate(start, end) \
     .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20)) \
     .map(lambda img: img.addBands(img.normalizedDifference(['B8', 'B4']).rename('NDVI')))
 
-ndvi_composite = s2.select('NDVI').median()
+ndvi_median = s2.select('NDVI').median()
 
-# 3. Function to process each tile
-def process_tile(tile_image, index):
-    tile_geom = tile_image.geometry()
+# 3. Function to export a tile safely
+def process_tile(tile_img, index):
+    geom = tile_img.geometry()
+    band_names = tile_img.bandNames()
+    has_n_tallmonths = band_names.contains('n_tallmonths')
 
-    n_tallmonths = tile_image.select('n_tallmonths')
-    sugarcane_mask = n_tallmonths.gte(1).selfMask()  # Mask only where sugarcane is detected
+    n_tallmonths = ee.Image(ee.Algorithms.If(
+        has_n_tallmonths,
+        tile_img.select('n_tallmonths'),
+        ee.Image.constant(0).rename('n_tallmonths').updateMask(ee.Image(0))
+    ))
 
-    ndvi_masked = ndvi_composite.updateMask(sugarcane_mask)
+    sugarcane_mask = n_tallmonths.gte(1).selfMask()
+    ndvi_masked = ndvi_median.updateMask(sugarcane_mask)
+    combined = ndvi_masked.addBands(n_tallmonths)
 
-    sampled_points = ndvi_masked.addBands(n_tallmonths).sample(
-        region=tile_geom,
+    points = combined.sample(
+        region=geom,
         scale=10,
         projection='EPSG:4326',
         geometries=True,
         seed=42
     )
 
-    file_name = f"tile_{index}"
-
     task = ee.batch.Export.table.toDrive(
-        collection=sampled_points,
-        description=file_name,
-        fileNamePrefix=file_name,
+        collection=points,
+        description=f"tile_{index}",
+        fileNamePrefix=f"tile_{index}",
         fileFormat='CSV'
     )
     task.start()
-    print(f"Export task started: {file_name}")
+    print(f"Export task started for tile {index}")
 
-# 4. Trigger export for each tile
-tile_list = gedi_tiles.toList(gedi_tiles.size())
+# 4. Get the list of tiles and run export
+tile_list = tiles.toList(tiles.size())
+num_tiles = tile_list.size().getInfo()
 
-for i in range(gedi_tiles.size().getInfo()):
+for i in range(num_tiles):
     tile = ee.Image(tile_list.get(i))
     process_tile(tile, i)

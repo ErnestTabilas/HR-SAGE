@@ -1,13 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  useMap,
-  Rectangle,
-  Popup,
-  Marker,
-  Polygon,
-} from "react-leaflet";
+import { MapContainer, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faSearch, faSpinner } from "@fortawesome/free-solid-svg-icons";
@@ -22,8 +14,6 @@ import {
   Text,
   Image as PDFImage,
   StyleSheet,
-  PDFDownloadLink,
-  BlobProvider,
 } from "@react-pdf/renderer";
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
@@ -166,7 +156,6 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
         tile.width = 256;
         tile.height = 256;
         const ctx = tile.getContext("2d");
-        ctx.imageSmoothingEnabled = false; // Ensures sharp rendering like GEE
 
         const bounds = this._tileCoordsToBounds(coords);
         const pointsInTile = data.filter((d) => {
@@ -181,13 +170,13 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
 
         const zoom = coords.z;
         const baseZoom = 7;
-        const radius = 0.15 * Math.pow(2, zoom - baseZoom);
+        const radius = 0.075 * Math.pow(2, zoom - baseZoom);
 
         pointsInTile.forEach((d) => {
           const latlngPoint = map.project([d.lat, d.lng], coords.z);
           const tileOrigin = map.project(bounds.getNorthWest(), coords.z);
-          const x = Math.round(latlngPoint.x - tileOrigin.x);
-          const y = Math.round(latlngPoint.y - tileOrigin.y);
+          const x = latlngPoint.x - tileOrigin.x;
+          const y = latlngPoint.y - tileOrigin.y;
 
           ctx.beginPath();
           ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
@@ -316,13 +305,6 @@ const CheckHarvest = () => {
   // Strip time to compare pure date values
   lastDate.setHours(0, 0, 0, 0);
   now.setHours(0, 0, 0, 0);
-
-  // Calculate days since last update
-  const diffInMs = now - lastDate;
-  const daysSinceUpdate = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-
-  // Days remaining until next 5-day cycle
-  const daysRemaining = 5 - (daysSinceUpdate % 5 || 5); // returns 5 if 0
 
   useEffect(() => {
     let idx = 0;
