@@ -14,10 +14,11 @@ import {
   faBell,
   faExclamationTriangle,
 } from "@fortawesome/free-solid-svg-icons";
-import { motion } from "framer-motion"; // Import framer-motion
+import { motion } from "framer-motion";
 import Home from "./pages/Home";
 import CheckHarvest from "./pages/CheckHarvest";
-import AboutUs from "./pages/AboutUs"; // Import AboutUs page
+import AboutUs from "./pages/AboutUs";
+import NotFound from "./pages/NotFound";
 
 const App = () => {
   return (
@@ -196,6 +197,7 @@ const MainContent = () => {
             <Route path="/" element={<Home />} />
             <Route path="/check-harvest" element={<CheckHarvest />} />
             <Route path="/about-us" element={<AboutUs />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </motion.div>
       </div>
