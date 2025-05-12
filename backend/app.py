@@ -11,7 +11,7 @@ from datetime import datetime
 # ---- Setup ----
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
-CORS(app)
+CORS(app, origins=["https://hr-sage.vercel.app", "http://localhost:3000"])
 
 # Write sa.json from environment variable if it doesn't exist
 if not os.path.exists("sa.json"):
