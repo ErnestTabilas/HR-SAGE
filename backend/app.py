@@ -52,11 +52,16 @@ def classify_growth_stage(ndvi, n_tallmonths):
         return "Grand Growth"
     elif ndvi >= 0.8 and n_tallmonths >= 6:
         return "Ripening"
-    return None  # Inconsistent combinations
-    
+    return None  # Inconsistent combination
+
+
+
 @app.route("/sugarcane-locations", methods=["GET"])
 def sugarcane_locations():
     try:
+        offset = int(request.args.get("offset", 0))
+        limit = int(request.args.get("limit", 10000))
+        
         all_data = []
         page_size = 100000
         offset = 0
@@ -104,7 +109,7 @@ def sugarcane_locations():
     except Exception as e:
         logging.error(f"Error fetching sugarcane data: {e}")
         return []
-
+    
 @app.route('/api/last-update', methods=["GET"])
 def last_update():
     try:
