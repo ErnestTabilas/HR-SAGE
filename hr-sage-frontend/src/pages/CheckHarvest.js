@@ -308,10 +308,10 @@ const CheckHarvest = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [readableDate, setReadableDate] = useState(null);
   const [basemap, setBasemap] = useState("street");
   const [searchHighlight, setSearchHighlight] = useState(null);
-
+  const [page, setPage] = useState(0); // Track page number
+  const [hasMore, setHasMore] = useState(true); // Track if there are more pages to load
   const [loadingMsg, setLoadingMsg] = useState("Initializing map...");
   const [selectedStages, setSelectedStages] = useState({
     Germination: true,
@@ -355,22 +355,39 @@ const CheckHarvest = () => {
   }, []);
 
   useEffect(() => {
-    if (cachedLocations) {
-      setLocations(cachedLocations);
-      setLoading(false);
-    } else {
-      axios
-        .get(`${API_BASE_URL}/sugarcane-locations`)
-        .then((res) => {
+    const fetchAllData = async () => {
+      setLoading(true);
+      let allData = [];
+      let currentPage = 0;
+      let hasMoreData = true;
+
+      while (hasMoreData) {
+        try {
+          const res = await axios.get(`${API_BASE_URL}/sugarcane-locations`, {
+            params: { page: currentPage },
+          });
           const points = Array.isArray(res.data.points) ? res.data.points : [];
-          cachedLocations = points;
-          setLocations(points);
+          allData = [...allData, ...points];
+          setLocations(allData);
           setLoading(false);
-        })
-        .catch((err) => {
+
+          // Check if there is more data to load
+          hasMoreData = res.data.has_more; // Assuming the API returns 'has_more'
+          currentPage += 1; // Move to the next page
+        } catch (err) {
           console.error("Error loading data:", err);
           setError(true);
-        });
+          setLoading(false);
+          break;
+        }
+      }
+    };
+
+    if (!cachedLocations) {
+      fetchAllData();
+    } else {
+      setLocations(cachedLocations);
+      setLoading(false);
     }
   }, []);
 
@@ -380,7 +397,6 @@ const CheckHarvest = () => {
       .then((data) => {
         if (data.last_updated) {
           setLastUpdated(data.last_updated);
-          setReadableDate(data.readable);
         }
       })
       .catch((err) => console.error("Failed to fetch last update:", err));

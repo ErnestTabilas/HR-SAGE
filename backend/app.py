@@ -1,6 +1,7 @@
+import json
 import os
 import logging
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from supabase import create_client, Client
 from google.oauth2 import service_account
@@ -106,38 +107,38 @@ def fetch_sugarcane_data_from_supabase():
 @app.route("/sugarcane-locations", methods=["GET"])
 def sugarcane_locations():
     try:
-        points = fetch_sugarcane_data_from_supabase()
-        logging.info(f"Returning {len(points)} sugarcane points from Supabase.")
-        return jsonify({"points": points})
+        offset = int(request.args.get("offset", 0))
+        limit = int(request.args.get("limit", 10000))
+        
+        response = supabase\
+            .table(TABLE_NAME)\
+            .select("lat, lng, ndvi, n_tallmonths")\
+            .gt("ndvi", 0)\
+            .gt("n_tallmonths", 0)\
+            .range(offset, offset + limit - 1)\
+            .execute()
+        
+        data = []
+        for row in response.data:
+            lat, lng = row.get("lat"), row.get("lng")
+            ndvi = row.get("ndvi")
+            n_tallmonths = row.get("n_tallmonths")
+            if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                continue
+            stage = classify_growth_stage(ndvi, n_tallmonths)
+            if stage:
+                data.append({
+                    "lat": lat,
+                    "lng": lng,
+                    "ndvi": ndvi,
+                    "n_tallmonths": n_tallmonths,
+                    "growth_stage": stage
+                })
+
+        return jsonify({"points": data})
     except Exception as e:
         logging.error(f"Error during data fetching: {e}")
         return jsonify({"error": "Error fetching sugarcane locations"}), 500
-
-def get_latest_csv_modified_date():
-    credentials = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=SCOPES
-    )
-
-    service = build('drive', 'v3', credentials=credentials)
-
-    # Query CSV files in the specified folder
-    query = f"'{FOLDER_ID}' in parents and mimeType='text/csv' and trashed=false"
-    results = service.files().list(
-        q=query,
-        pageSize=100,
-        fields="files(id, name, modifiedTime)"
-    ).execute()
-
-    files = results.get('files', [])
-
-    if not files:
-        return None
-
-    # Get the most recently modified file
-    latest_file = max(files, key=lambda x: x['modifiedTime'])
-    latest_date = latest_file['modifiedTime'][:10]  # "YYYY-MM-DD"
-
-    return latest_date
 
 @app.route('/api/last-update', methods=["GET"])
 def last_update():
