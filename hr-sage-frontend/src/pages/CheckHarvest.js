@@ -167,10 +167,10 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
           Math.pow(2, zoom + 8);
 
         // Set pixel size as 10 meters on the ground, but adjusted for map zoom
-        let pixelSize = 70 / metersPerPixel;
+        let pixelSize = 75 / metersPerPixel;
 
         // Minimum visible size at zoomed out (e.g. PH fully in view)
-        const minVisibleSize = 0.1;
+        const minVisibleSize = 0.2;
         pixelSize = Math.max(pixelSize, minVisibleSize);
 
         // Simplify or aggregate data based on zoom level

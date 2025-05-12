@@ -33,41 +33,67 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 # ---- API ----
 # ---- Pagination Parameters ----
 
+def classify_growth_stage(ndvi, n_tallmonths):
+    if ndvi < 0.2 or n_tallmonths < 1:
+        return None  # Discard noisy or sparse detections
+    elif 0.2 <= ndvi < 0.4 and n_tallmonths >= 1:
+        return "Germination"
+    elif 0.4 <= ndvi < 0.6 and n_tallmonths >= 2:
+        return "Tillering"
+    elif 0.6 <= ndvi < 0.8 and n_tallmonths >= 4:
+        return "Grand Growth"
+    elif ndvi >= 0.8 and n_tallmonths >= 6:
+        return "Ripening"
+    return None  # Inconsistent combination
+
+
+
 def fetch_sugarcane_data_from_supabase():
     try:
         all_data = []
-        page_size = 100000  # Number of rows per page, adjust based on your needs
-        offset = 0  # Starting point for pagination
+        page_size = 100000
+        offset = 0
 
         while True:
-            # Fetch the next page of data with filtering
             response = supabase\
                 .table(TABLE_NAME)\
-                .select("*")\
-                .neq("growth_stage", "No Sugarcane")\
+                .select("lat, lng, ndvi, n_tallmonths")\
                 .gt("ndvi", 0)\
                 .gt("n_tallmonths", 0)\
                 .range(offset, offset + page_size - 1)\
                 .execute()
-            
-            # Check if the response contains data
-            if response.data:
-                all_data.extend(response.data)
-                logging.info(f"Fetched {len(response.data)} filtered rows, total: {len(all_data)}.")
-                
-                if len(response.data) < page_size:
-                    logging.info("End of filtered data reached.")
-                    break
 
-                offset += page_size
-            else:
-                logging.warning("No data returned for this page.")
+            if not response.data:
                 break
-        
+
+            for row in response.data:
+                lat, lng = row.get("lat"), row.get("lng")
+                ndvi = row.get("ndvi")
+                n_tallmonths = row.get("n_tallmonths")
+
+                # sanity check for coordinates
+                if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                    continue
+
+                stage = classify_growth_stage(ndvi, n_tallmonths)
+                if stage:
+                    all_data.append({
+                        "lat": lat,
+                        "lng": lng,
+                        "ndvi": ndvi,
+                        "n_tallmonths": n_tallmonths,
+                        "growth_stage": stage
+                    })
+
+            if len(response.data) < page_size:
+                break
+            offset += page_size
+
+        logging.info(f"Filtered total sugarcane points: {len(all_data)}")
         return all_data
-    
+
     except Exception as e:
-        logging.error(f"Error fetching filtered data from Supabase: {e}")
+        logging.error(f"Error fetching sugarcane data: {e}")
         return []
 
 @app.route("/sugarcane-locations", methods=["GET"])
