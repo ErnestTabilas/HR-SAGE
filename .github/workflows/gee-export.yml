@@ -1,7 +1,5 @@
 name: GEE Export Every 5 Days
 
-# 1) schedule: runs every 5 days at midnight UTC
-# 2) workflow_dispatch: allows manual trigger from Actions tab
 on:
   schedule:
     - cron: "0 0 */5 * *"
@@ -26,21 +24,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install earthengine-api google-auth google-api-python-client pandas gspread oauth2client supabase
 
-      # Step 4: Write service account JSON
+      # Step 4: Write service account JSON to expected path
       - name: Write service account JSON
-        run: echo '${{ secrets.GOOGLE_DRIVE_CREDENTIALS_JSON }}' > sa.json
+        run: |
+          mkdir -p backend/data
+          echo '${{ secrets.GOOGLE_DRIVE_CREDENTIALS_JSON }}' > backend/data/service-account.json
 
       # Step 5: Authenticate and initialize Earth Engine
-      - name: Set up Earth Engine
+      - name: Run gee_export script
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/backend/data/service-account.json
         run: |
           python backend/gee_export.py
 
       # Step 6: Run update script to merge CSVs into Sheet and push to Supabase
-      - name: Trigger update_sheet script
+      - name: Run update_sheet script
         env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/sa.json
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/backend/data/service-account.json
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
