@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO)
 # Directory and service account file setup
 current_dir = os.path.dirname(os.path.abspath(__file__))
 SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
-KEY_FILE = 'sa.json'
+KEY_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
 TARGET_FOLDER_ID = '1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK'  # your Drive folder ID
 
 # Initialize Earth Engine using service account
