@@ -52,11 +52,10 @@ def classify_growth_stage(ndvi, n_tallmonths):
         return "Grand Growth"
     elif ndvi >= 0.8 and n_tallmonths >= 6:
         return "Ripening"
-    return None  # Inconsistent combination
-
-
-
-def fetch_sugarcane_data_from_supabase():
+    return None  # Inconsistent combinations
+    
+@app.route("/sugarcane-locations", methods=["GET"])
+def sugarcane_locations():
     try:
         all_data = []
         page_size = 100000
@@ -68,8 +67,10 @@ def fetch_sugarcane_data_from_supabase():
                 .select("lat, lng, ndvi, n_tallmonths")\
                 .gt("ndvi", 0)\
                 .gt("n_tallmonths", 0)\
-                .range(offset, offset + page_size - 1)\
+                .order("lat")\
+                .range(offset, offset + limit - 1)\
                 .execute()
+
 
             if not response.data:
                 break
@@ -103,42 +104,6 @@ def fetch_sugarcane_data_from_supabase():
     except Exception as e:
         logging.error(f"Error fetching sugarcane data: {e}")
         return []
-
-@app.route("/sugarcane-locations", methods=["GET"])
-def sugarcane_locations():
-    try:
-        offset = int(request.args.get("offset", 0))
-        limit = int(request.args.get("limit", 10000))
-        
-        response = supabase\
-            .table(TABLE_NAME)\
-            .select("lat, lng, ndvi, n_tallmonths")\
-            .gt("ndvi", 0)\
-            .gt("n_tallmonths", 0)\
-            .range(offset, offset + limit - 1)\
-            .execute()
-        
-        data = []
-        for row in response.data:
-            lat, lng = row.get("lat"), row.get("lng")
-            ndvi = row.get("ndvi")
-            n_tallmonths = row.get("n_tallmonths")
-            if not (-90 <= lat <= 90 and -180 <= lng <= 180):
-                continue
-            stage = classify_growth_stage(ndvi, n_tallmonths)
-            if stage:
-                data.append({
-                    "lat": lat,
-                    "lng": lng,
-                    "ndvi": ndvi,
-                    "n_tallmonths": n_tallmonths,
-                    "growth_stage": stage
-                })
-
-        return jsonify({"points": data})
-    except Exception as e:
-        logging.error(f"Error during data fetching: {e}")
-        return jsonify({"error": "Error fetching sugarcane locations"}), 500
 
 @app.route('/api/last-update', methods=["GET"])
 def last_update():
