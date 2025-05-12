@@ -2,11 +2,16 @@ import os
 import io
 import json
 import pandas as pd
+import logging
+
 from datetime import datetime
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from google.oauth2 import service_account
 from supabase import create_client, Client
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
 
 # --- Configurations ---
 DRIVE_FOLDER_ID = '1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK'
