@@ -18,6 +18,8 @@ import {
 import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
+const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:5000";
+
 let cachedLocations = null;
 
 const getColor = (stage) => {
@@ -358,7 +360,7 @@ const CheckHarvest = () => {
       setLoading(false);
     } else {
       axios
-        .get("http://127.0.0.1:5000/sugarcane-locations")
+        .get(`${API_BASE_URL}/sugarcane-locations`)
         .then((res) => {
           const points = Array.isArray(res.data.points) ? res.data.points : [];
           cachedLocations = points;
@@ -373,7 +375,7 @@ const CheckHarvest = () => {
   }, []);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/api/last-update")
+    fetch(`${API_BASE_URL}/api/last-update`)
       .then((res) => res.json())
       .then((data) => {
         if (data.last_updated) {
