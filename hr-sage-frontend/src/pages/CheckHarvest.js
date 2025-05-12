@@ -158,6 +158,15 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
         const ctx = tile.getContext("2d");
 
         const bounds = this._tileCoordsToBounds(coords);
+        const zoom = coords.z;
+
+        // Estimate pixel size in screen pixels (10m × 10m)
+        const centerLat = bounds.getCenter().lat;
+        const metersPerPixel =
+          (40075016.686 * Math.cos((centerLat * Math.PI) / 180)) /
+          Math.pow(2, zoom + 8);
+        const pixelSize = 10 / metersPerPixel; // 10m in pixels
+
         const pointsInTile = data.filter((d) => {
           return (
             d.lat < bounds.getNorth() &&
@@ -168,20 +177,19 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
           );
         });
 
-        const zoom = coords.z;
-        const baseZoom = 7;
-        const radius = 0.075 * Math.pow(2, zoom - baseZoom);
-
         pointsInTile.forEach((d) => {
-          const latlngPoint = map.project([d.lat, d.lng], coords.z);
-          const tileOrigin = map.project(bounds.getNorthWest(), coords.z);
+          const latlngPoint = map.project([d.lat, d.lng], zoom);
+          const tileOrigin = map.project(bounds.getNorthWest(), zoom);
           const x = latlngPoint.x - tileOrigin.x;
           const y = latlngPoint.y - tileOrigin.y;
 
-          ctx.beginPath();
-          ctx.arc(x, y, radius, 0, 2 * Math.PI, false);
           ctx.fillStyle = getColor(d.growth_stage);
-          ctx.fill();
+          ctx.fillRect(
+            x - pixelSize / 2,
+            y - pixelSize / 2,
+            pixelSize,
+            pixelSize
+          );
         });
 
         return tile;
@@ -614,13 +622,13 @@ const CheckHarvest = () => {
               scrollWheelZoom={true}
               className="z-0"
             >
+              <MapBoundsAdjuster />
+              <TileLayerSwitcher selectedLayer={basemap} />
               <PixelCanvasLayer
                 data={locations}
                 selectedStages={selectedStages}
+                className="z-50"
               />
-
-              <TileLayerSwitcher selectedLayer={basemap} />
-              <MapBoundsAdjuster />
             </MapContainer>
             <button
               onClick={handleGenerateAndDownloadPDF}
