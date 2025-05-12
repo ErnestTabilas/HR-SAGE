@@ -30,7 +30,7 @@ FOLDER_ID = "1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK"  # Google Drive folder ID
 PAGE_SIZE = 10000  # Define how many rows to fetch per request
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-TABLE_NAME = "sugarcane_data" 
+TABLE_NAME = "backup" 
 
 if not SUPABASE_URL or not SUPABASE_KEY:
     logging.error("Supabase URL or Key not set in environment variables")
