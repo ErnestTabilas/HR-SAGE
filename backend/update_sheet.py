@@ -2,16 +2,11 @@ import os
 import io
 import json
 import pandas as pd
-import logging
-
 from datetime import datetime
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
 from google.oauth2 import service_account
 from supabase import create_client, Client
-
-# Setup logging
-logging.basicConfig(level=logging.INFO)
 
 # --- Configurations ---
 DRIVE_FOLDER_ID = '1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK'
@@ -96,8 +91,45 @@ def insert_new_records(df, existing_lat_lng):
 
 # --- Main logic ---
 def main():
-    logging.info("Skipping actual database update (testing only).")
-    return
+    print("Fetching CSVs from Drive...")
+    files = list_csv_files_sorted(DRIVE_FOLDER_ID)
+    print(f"Found {len(files)} CSVs.")
+
+    uploaded_files = load_uploaded_files()
+    new_dataframes = []
+
+    for file in files:
+        file_id = file['id']
+        file_name = file['name']
+        mod_time = file['modifiedTime']
+
+        if uploaded_files.get(file_id) == mod_time:
+            print(f"Skipping already uploaded file: {file_name}")
+            continue
+
+        print(f"Downloading new or updated file: {file_name}")
+        df = download_csv_file(file_id)
+        new_dataframes.append(df)
+        uploaded_files[file_id] = mod_time
+
+    if not new_dataframes:
+        print("No new data to upload.")
+        return
+
+    merged_df = pd.concat(new_dataframes, ignore_index=True).drop_duplicates()
+    print(f"Merged {len(merged_df)} rows.")
+
+    # Retrieve existing lat-lng records from Supabase
+    existing_lat_lng = get_existing_lat_lng_records()
+
+    # Update NDVI for existing records and insert new records
+    print("Updating existing records and inserting new data into Supabase...")
+    update_ndvi_for_existing_records(merged_df, existing_lat_lng)
+    insert_new_records(merged_df, existing_lat_lng)
+
+    # Save tracking info for uploaded files
+    save_uploaded_files(uploaded_files)
+    print("Done updating Supabase.")
 
 if __name__ == '__main__':
     main()
