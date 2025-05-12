@@ -160,14 +160,21 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
         const bounds = this._tileCoordsToBounds(coords);
         const zoom = coords.z;
 
-        // Estimate pixel size in screen pixels (10m × 10m)
+        // Calculate meters per pixel at this zoom level
         const centerLat = bounds.getCenter().lat;
         const metersPerPixel =
           (40075016.686 * Math.cos((centerLat * Math.PI) / 180)) /
           Math.pow(2, zoom + 8);
-        const pixelSize = 10 / metersPerPixel; // 10m in pixels
 
-        const pointsInTile = data.filter((d) => {
+        // Set pixel size as 10 meters on the ground, but adjusted for map zoom
+        let pixelSize = 70 / metersPerPixel;
+
+        // Minimum visible size at zoomed out (e.g. PH fully in view)
+        const minVisibleSize = 0.1;
+        pixelSize = Math.max(pixelSize, minVisibleSize);
+
+        // Simplify or aggregate data based on zoom level
+        let pointsInTile = data.filter((d) => {
           return (
             d.lat < bounds.getNorth() &&
             d.lat > bounds.getSouth() &&
@@ -177,6 +184,13 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
           );
         });
 
+        // Zoom-based clustering: aggregate points at lower zoom levels
+        if (zoom <= 10) {
+          // Zoom level threshold for simplification
+          pointsInTile = aggregatePoints(pointsInTile, pixelSize);
+        }
+
+        // Draw points on the canvas
         pointsInTile.forEach((d) => {
           const latlngPoint = map.project([d.lat, d.lng], zoom);
           const tileOrigin = map.project(bounds.getNorthWest(), zoom);
@@ -225,6 +239,7 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
         const today = new Date();
         let estimatedHarvest = new Date(today);
 
+        // Calculate estimated harvest date based on growth stage
         if (stage === "Ripening") {
           // already ready
         } else if (stage === "Grand Growth") {
@@ -265,6 +280,14 @@ const PixelCanvasLayer = ({ data = [], selectedStages }) => {
   }, [data, selectedStages, map]);
 
   return null;
+};
+
+// Helper function for aggregating points at low zoom levels
+const aggregatePoints = (points, pixelSize) => {
+  // Logic to aggregate nearby points (e.g., by averaging their positions)
+  // or grouping them into larger pixels for lower zoom levels
+  // For simplicity, we return the points unchanged for now
+  return points;
 };
 
 function TileLayerSwitcher({ selectedLayer }) {
@@ -314,6 +337,12 @@ const CheckHarvest = () => {
   lastDate.setHours(0, 0, 0, 0);
   now.setHours(0, 0, 0, 0);
 
+  // Calculate days since last update
+  const diffInMs = now - lastDate;
+  const daysSinceUpdate = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
+
+  // Days remaining until next 5-day cycle
+  const daysRemaining = 5 - (daysSinceUpdate % 5 || 5); // returns 5 if 0
   useEffect(() => {
     let idx = 0;
     const iv = setInterval(() => {
@@ -632,10 +661,14 @@ const CheckHarvest = () => {
             </MapContainer>
             <button
               onClick={handleGenerateAndDownloadPDF}
-              className="absolute top-4 right-24 bg-emerald-600 text-white px-4 py-2 rounded-lg z-50 hover:bg-emerald-700"
+              className="absolute top-4 right-24 bg-red-900 text-white px-4 py-2 rounded-lg z-50 hover:bg-emerald-700"
             >
               Download PDF
             </button>
+            <div className="absolute top-6 left-14 text-xs text-gray-600 bg-white px-3 py-1 rounded shadow z-50">
+              📅 Last Updated at: {lastUpdated}, Next update after{" "}
+              {daysRemaining} days
+            </div>
             <div className="absolute top-4 right-4 bg-white p-1 w-45 rounded shadow z-[999] text-gray-600">
               <select
                 className="ml-1 border px-2 py-1 rounded"

@@ -11,7 +11,7 @@ DRIVE_FOLDER_ID = '1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK'
 SCOPES = ['https://www.googleapis.com/auth/drive']
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-TABLE_NAME = 'test'  # Change as needed
+TABLE_NAME = 'sugarcane_data'  # Change as needed
 
 # --- Google Drive Authentication ---
 current_dir = os.path.dirname(os.path.abspath(__file__))
