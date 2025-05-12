@@ -12,8 +12,15 @@ logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 CORS(app)
 
-current_dir = os.path.dirname(os.path.abspath(__file__))
-SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
+# Write sa.json from environment variable if it doesn't exist
+if not os.path.exists("sa.json"):
+    creds_json = os.environ.get("GOOGLE_DRIVE_CREDENTIALS_JSON")
+    if creds_json:
+        with open("sa.json", "w") as f:
+            json.dump(json.loads(creds_json), f)
+
+SERVICE_ACCOUNT_FILE = "sa.json"
+
 SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly"
 ]

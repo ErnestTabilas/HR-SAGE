@@ -16,15 +16,19 @@ TABLE_NAME = 'sugarcane_data'
 TRACKING_FILE = 'uploaded_files.json'
 
 # --- Authentication ---
-current_dir = os.path.dirname(os.path.abspath(__file__))
-SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
-SCOPES = [
-    "https://www.googleapis.com/auth/drive.readonly"
-]
+SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
+
+# Write sa.json from environment variable if not already written
+if not os.path.exists("sa.json"):
+    creds_json = os.environ.get("GOOGLE_DRIVE_CREDENTIALS_JSON")
+    if creds_json:
+        with open("sa.json", "w") as f:
+            json.dump(json.loads(creds_json), f)
 
 credentials = service_account.Credentials.from_service_account_file(
-    SERVICE_ACCOUNT_FILE, scopes=SCOPES
+    "sa.json", scopes=SCOPES
 )
+
 drive_service = build("drive", "v3", credentials=credentials)
 
 # --- Supabase Client ---

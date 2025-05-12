@@ -2,6 +2,7 @@ import ee
 import time
 import os
 import logging
+import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -9,9 +10,15 @@ from googleapiclient.discovery import build
 logging.basicConfig(level=logging.INFO)
 
 # Directory and service account file setup
-current_dir = os.path.dirname(os.path.abspath(__file__))
-SERVICE_ACCOUNT_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
-KEY_FILE = os.path.join(current_dir, '..', 'data', 'service-account.json')
+# Write sa.json from environment variable if it doesn't exist
+if not os.path.exists("sa.json"):
+    creds_json = os.environ.get("GOOGLE_DRIVE_CREDENTIALS_JSON")
+    if creds_json:
+        with open("sa.json", "w") as f:
+            json.dump(json.loads(creds_json), f)
+
+KEY_FILE = "sa.json"
+
 TARGET_FOLDER_ID = '1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK'  # your Drive folder ID
 
 # Initialize Earth Engine using service account
