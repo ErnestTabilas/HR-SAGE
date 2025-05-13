@@ -43,20 +43,15 @@ const tileLayers = {
     url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
     attribution: "&copy; OpenStreetMap contributors",
   },
-  terrain: {
-    url: "https://tiles.stadiamaps.com/tiles/stamen_terrain_background/{z}/{x}/{y}{r}.png",
+  plain: {
+    url: "http://tile.mtbmap.cz/mtbmap_tiles/{z}/{x}/{y}.png",
     attribution:
-      '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a>, <a href="https://www.stamen.com/" target="_blank">Stamen Design</a>, <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a>, <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &amp; USGS',
   },
   world: {
     url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     attribution:
       "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
-  },
-  satellite: {
-    url: "https://tiles.stadiamaps.com/tiles/alidade_satellite/{z}/{x}/{y}{r}.jpg",
-    attribution:
-      '&copy; CNES, Airbus DS, PlanetObserver (Contains Copernicus Data) | <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a>, <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a>, <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
   },
   dark: {
     url: "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",
@@ -321,10 +316,10 @@ const CheckHarvest = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
-  const [basemap, setBasemap] = useState("street");
+  const [basemap, setBasemap] = useState("world");
   const [searchHighlight, setSearchHighlight] = useState(null);
   const [page, setPage] = useState(0); // Track page number
-  const [hasMore, setHasMore] = useState(true); // Track if there are more pages to load
+  // const [hasMore, setHasMore] = useState(true); // Track if there are more pages to load
   const [loadingMsg, setLoadingMsg] = useState("Initializing map...");
   const [selectedStages, setSelectedStages] = useState({
     Germination: true,
@@ -375,7 +370,7 @@ const CheckHarvest = () => {
       setLoading(true);
       let allData = [];
       let currentPage = 0;
-      let hasMoreData = true;
+      let hasMoreData = true; // Initialize hasMoreData
       // Check if more data is available (allData != TOTAL_ROWS)
       while (hasMoreData) {
         try {
@@ -392,12 +387,9 @@ const CheckHarvest = () => {
           } else {
             allData = [...allData, ...points];
             setLocations(allData);
-            console.log(
-              `Page ${currentPage} fetched (${points.length} rows). Total: ${allData.length}`
-            );
           }
 
-          // Check if there is more data to load
+          // Check if there is more data to load (TESTING)
           hasMoreData = Boolean(res.data.has_more);
           currentPage += 1; // Move to the next page
 
@@ -724,9 +716,8 @@ const CheckHarvest = () => {
                 value={basemap}
                 onChange={(e) => setBasemap(e.target.value)}
               >
-                <option value="terrain">🏔️</option>
                 <option value="world">🌍</option>
-                <option value="satellite">🛰️</option>
+                <option value="plain">🗺️</option>
                 <option value="street">🚗</option>
                 <option value="dark">🌙</option>
               </select>
@@ -740,7 +731,9 @@ const CheckHarvest = () => {
               <p className="text-lg font-medium text-red-600 text-center pt-6 px-6">
                 Failed to load sugarcane data.
               </p>
-              <p className="text-gray-500">Please reload the page.</p>
+              <p className="text-gray-500">
+                Please check your internet connetivity then reload the page.
+              </p>
             </div>
           </div>
         )}
