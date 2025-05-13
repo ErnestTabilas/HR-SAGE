@@ -69,6 +69,12 @@ const Home = () => {
             updates every five days ensure you always have the latest insights
             for optimal harvest timing.
           </p>
+          <a
+            href="/check-harvest"
+            className="mt-4 px-6 py-2 text-lg font-semibold text-white rounded-lg transition font-thin bg-emerald-700 hover:bg-emerald-800"
+          >
+            Go to Check Harvest Page
+          </a>
         </div>
       </div>
     </div>

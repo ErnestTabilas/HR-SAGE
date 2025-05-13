@@ -57,10 +57,14 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const stageInfo = [
-    { name: "Germination", color: "bg-red-500", range: "(0.1 - 0.2)" },
-    { name: "Tillering", color: "bg-orange-500", range: "(0.2 - 0.4)" },
-    { name: "Grand Growth", color: "bg-violet-500", range: "(0.5 - 0.7)" },
-    { name: "Ripening", color: "bg-blue-500", range: "(0.3 - 0.5)" },
+    { name: "Germination", color: "bg-red-500", range: "(0.2 - 0.39)" },
+    { name: "Tillering", color: "bg-orange-500", range: "(0.4 - 0.59)" },
+    { name: "Grand Growth", color: "bg-violet-500", range: "(0.6 - 0.79)" },
+    {
+      name: "Ripening (HARVEST-READY)",
+      color: "bg-blue-500",
+      range: "(0.8 -0.9)",
+    },
   ];
 
   return (
@@ -85,9 +89,7 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
       </div>
 
       <div className="bg-white p-4 rounded-xl shadow space-y-2">
-        <h4 className="text-lg font-bold text-green-700">
-          Sugarcane Growth Stages
-        </h4>
+        <h4 className="text-lg font-bold text-green-700">Legend</h4>
         <table className="w-full text-sm">
           <thead>
             <tr className="text-left text-gray-500">
@@ -107,7 +109,7 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
                     className={`w-4 h-4 rounded-full ${
                       selectedStages[stage.name] ? stage.color : "bg-gray-300"
                     }`}
-                  ></span>
+                  />
                   {stage.name}
                 </td>
                 <td className="text-right text-gray-600 text-xs">
@@ -122,10 +124,11 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
       <div className="bg-white p-4 rounded-xl shadow text-sm text-gray-700 space-y-2">
         <h4 className="text-lg font-bold text-green-700">About this Map</h4>
         <p>
-          This map visualizes sugarcane growth stages via NDVI pixel overlays.
-          Click a pixel to view stage & harvest readiness. Click on the colored
-          ellipses on the Legend panel to toggle which sugarcane growth stage to
-          display on the map.
+          This map visualizes sugarcane crop locations in the country and their
+          respective growth stages via NDVI pixel overlays. Click a pixel to
+          view stage & harvest readiness. Click on the colored ellipses on the
+          Legend panel to toggle which sugarcane growth stage to display on the
+          map. You can also download a PDF of the map with the
         </p>
       </div>
     </div>
@@ -324,12 +327,14 @@ const CheckHarvest = () => {
   const mapRef = useRef();
 
   const loadingTips = [
+    "⏳ Please wait patiently as large data is being loaded.",
+    "🕒 Loading may take 2-3 minutes.",
     "💡 Tip: Click on sugarcane points to see details.",
     "🧭 Tip: Use the search bar to zoom.",
     "🔍 Tip: Toggle stages in the legend.",
-    "🧭 Tip: If the map fails to load within 3 mins. Reload the page.",
-    "🌱 Germination (NDVI 0.1–0.2): Early growth.",
-    "🌾 Ripening (NDVI 0.3–0.5): Ready for harvest soon.",
+    "🧭 Tip: If the map fails to load within 5 mins. Reload the page.",
+    "🌱 Germination (NDVI = 0.2–0.4): Early growth.",
+    "🌾 Ripening (NDVI >= 0.8): Ready for harvest soon.",
     "🗓️ Data updates every 5 days.",
   ];
 
@@ -366,22 +371,26 @@ const CheckHarvest = () => {
         try {
           const res = await axios.get(`${API_BASE_URL}/sugarcane-locations`, {
             params: { page: currentPage },
+            timeout: 500000, // 500 seconds
           });
+
           const points = Array.isArray(res.data.points) ? res.data.points : [];
+
           allData = [...allData, ...points];
           setLocations(allData);
-          setLoading(false);
 
           // Check if there is more data to load
-          hasMoreData = res.data.has_more; // Assuming the API returns 'has_more'
+          hasMoreData = res.data.has_more === true; // Assuming the API returns 'has_more'
           currentPage += 1; // Move to the next page
+
+          await new Promise((resolve) => setTimeout(resolve, 100));
         } catch (err) {
           console.error("Error loading data:", err);
           setError(true);
-          setLoading(false);
           break;
         }
       }
+      setLoading(false);
     };
 
     if (!cachedLocations) {
@@ -392,16 +401,16 @@ const CheckHarvest = () => {
     }
   }, []);
 
-  useEffect(() => {
-    fetch(`${API_BASE_URL}/api/last-update`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.last_updated) {
-          setLastUpdated(data.last_updated);
-        }
-      })
-      .catch((err) => console.error("Failed to fetch last update:", err));
-  }, []);
+  // useEffect(() => {
+  //   fetch(`${API_BASE_URL}/api/last-update`)
+  //     .then((res) => res.json())
+  //     .then((data) => {
+  //       if (data.last_updated) {
+  //         setLastUpdated(data.last_updated);
+  //       }
+  //     })
+  //     .catch((err) => console.error("Failed to fetch last update:", err));
+  // }, []);
 
   const searchLocation = async (query) => {
     setLoadingMsg(`Searching for "${query}"...`);
@@ -555,7 +564,7 @@ const CheckHarvest = () => {
                 }}
               />
               <Text style={pdfStyles.legendLabel}>
-                Germination (NDVI 0.1–0.2)
+                Germination (NDVI 0.2–0.39)
               </Text>
             </View>
             <View style={pdfStyles.legendItem}>
@@ -566,7 +575,7 @@ const CheckHarvest = () => {
                 }}
               />
               <Text style={pdfStyles.legendLabel}>
-                Tillering (NDVI 0.2–0.3)
+                Tillering (NDVI 0.4–0.59)
               </Text>
             </View>
             <View style={pdfStyles.legendItem}>
@@ -577,7 +586,7 @@ const CheckHarvest = () => {
                 }}
               />
               <Text style={pdfStyles.legendLabel}>
-                Grand Growth (NDVI 0.3–0.4)
+                Grand Growth (NDVI 0.6–0.79)
               </Text>
             </View>
             <View style={pdfStyles.legendItem}>
@@ -587,7 +596,9 @@ const CheckHarvest = () => {
                   backgroundColor: getColor("Ripening"),
                 }}
               />
-              <Text style={pdfStyles.legendLabel}>Ripening (NDVI 0.4–0.5)</Text>
+              <Text style={pdfStyles.legendLabel}>
+                Ripening READY FOR HARVEST (NDVI 0.8-above)
+              </Text>
             </View>
           </View>
 
@@ -684,10 +695,10 @@ const CheckHarvest = () => {
             >
               Download PDF
             </button>
-            <div className="absolute top-6 left-14 text-xs text-gray-600 bg-white px-3 py-1 rounded shadow z-50">
+            {/* <div className="absolute top-6 left-14 text-xs text-gray-600 bg-white px-3 py-1 rounded shadow z-50">
               📅 Last Updated at: {lastUpdated}, Next update after{" "}
               {daysRemaining} days
-            </div>
+            </div> */}
             <div className="absolute top-4 right-4 bg-white p-1 w-45 rounded shadow z-[999] text-gray-600">
               <select
                 className="ml-1 border px-2 py-1 rounded"

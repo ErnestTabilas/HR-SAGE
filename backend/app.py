@@ -28,7 +28,6 @@ SCOPES = [
 FOLDER_ID = "1UwAPlOGM3HArYKTMNB_txg0N-OudHHzK"  # Google Drive folder ID
 
 # ---- Supabase Config ----
-PAGE_SIZE = 10000  # Define how many rows to fetch per request
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 TABLE_NAME = "backup" 
@@ -54,73 +53,94 @@ def classify_growth_stage(ndvi, n_tallmonths):
         return "Ripening"
     return None  # Inconsistent combination
 
-
-
 @app.route("/sugarcane-locations", methods=["GET"])
 def sugarcane_locations():
     try:
-        offset = int(request.args.get("offset", 0))
-        limit = int(request.args.get("limit", 10000))
-        
-        all_data = []
-        page_size = 100000
-        offset = 0
+        # --- Parse query params ---
+        page = int(request.args.get("page", 0))
+        page_size = int(request.args.get("page_size", 5000))
+        offset = page * page_size
 
-        while True:
-            response = supabase\
-                .table(TABLE_NAME)\
-                .select("lat, lng, ndvi, n_tallmonths")\
-                .gt("ndvi", 0)\
-                .gt("n_tallmonths", 0)\
-                .order("lat")\
-                .range(offset, offset + limit - 1)\
-                .execute()
+        response = supabase\
+            .table(TABLE_NAME)\
+            .select("lat, lng, ndvi, n_tallmonths")\
+            .gt("ndvi", 0)\
+            .gt("n_tallmonths", 0)\
+            .order("lat")\
+            .range(offset, offset + page_size - 1)\
+            .execute()
 
+        results = []
 
-            if not response.data:
-                break
+        for row in response.data:
+            lat, lng = row.get("lat"), row.get("lng")
+            ndvi = row.get("ndvi")
+            n_tallmonths = row.get("n_tallmonths")
 
-            for row in response.data:
-                lat, lng = row.get("lat"), row.get("lng")
-                ndvi = row.get("ndvi")
-                n_tallmonths = row.get("n_tallmonths")
+            # Sanity check
+            if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                continue
 
-                # sanity check for coordinates
-                if not (-90 <= lat <= 90 and -180 <= lng <= 180):
-                    continue
+            stage = classify_growth_stage(ndvi, n_tallmonths)
+            if stage:
+                results.append({
+                    "lat": lat,
+                    "lng": lng,
+                    "ndvi": ndvi,
+                    "n_tallmonths": n_tallmonths,
+                    "growth_stage": stage
+                })
 
-                stage = classify_growth_stage(ndvi, n_tallmonths)
-                if stage:
-                    all_data.append({
-                        "lat": lat,
-                        "lng": lng,
-                        "ndvi": ndvi,
-                        "n_tallmonths": n_tallmonths,
-                        "growth_stage": stage
-                    })
+        has_more = len(response.data) == page_size
 
-            if len(response.data) < page_size:
-                break
-            offset += page_size
-
-        logging.info(f"Filtered total sugarcane points: {len(all_data)}")
-        return all_data
+        return jsonify({
+            "page": page,
+            "page_size": page_size,
+            "has_more": has_more,
+            "points": results
+        })
 
     except Exception as e:
         logging.error(f"Error fetching sugarcane data: {e}")
-        return []
-    
-@app.route('/api/last-update', methods=["GET"])
-def last_update():
-    try:
-        last_updated = get_latest_csv_modified_date()
-        if not last_updated:
-            return jsonify({"error": "No CSV files found"}), 404
-        readable_date = datetime.strptime(last_updated, "%Y-%m-%d").strftime("%B %d, %Y")
-        logging.info("Successfully fetched last updated data time.")
-        return jsonify({"last_updated": last_updated, "readable": readable_date})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to fetch data"}), 500
+
+# def get_latest_csv_modified_date():
+#     credentials = service_account.Credentials.from_service_account_file(
+#         SERVICE_ACCOUNT_FILE, scopes=SCOPES
+#     )
+
+#     service = build('drive', 'v3', credentials=credentials)
+
+#     # Query CSV files in the specified folder
+#     query = f"'{FOLDER_ID}' in parents and mimeType='text/csv' and trashed=false"
+#     results = service.files().list(
+#         q=query,
+#         pageSize=100,
+#         fields="files(id, name, modifiedTime)"
+#     ).execute()
+
+#     files = results.get('files', [])
+
+#     if not files:
+#         return None
+
+#     # Get the most recently modified file
+#     latest_file = max(files, key=lambda x: x['modifiedTime'])
+#     latest_date = latest_file['modifiedTime'][:10]  # "YYYY-MM-DD"
+
+#     return latest_date
+
+# @app.route('/api/last-update', methods=["GET"])
+# def last_update():
+#     try:
+#         last_updated = get_latest_csv_modified_date()
+#         if not last_updated:
+#             return jsonify({"error": "No CSV files found"}), 404
+#         readable_date = datetime.strptime(last_updated, "%Y-%m-%d").strftime("%B %d, %Y")
+#         logging.info("Successfully fetched last updated data time.")
+#         return jsonify({"last_updated": last_updated, "readable": readable_date})
+#     except Exception as e:
+#         return jsonify({"error": str(e)}), 500
     
 if __name__ == '__main__':
     import os

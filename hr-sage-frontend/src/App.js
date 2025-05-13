@@ -140,7 +140,7 @@ const MainContent = () => {
       <div
         className={`fixed top-0 left-0 h-full bg-emerald-600 shadow-md transform ${
           menuOpen ? "translate-x-0" : "-translate-x-full"
-        } transition-transform duration-300 ease-in-out z-20`}
+        } transition-transform duration-300 ease-in-out z-50`}
         style={{ width: "250px" }}
       >
         <div className="flex justify-between p-4">
