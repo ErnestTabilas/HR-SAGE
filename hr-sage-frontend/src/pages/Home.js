@@ -67,7 +67,8 @@ const Home = () => {
             for its current NDVI, and download printable reports or PDF
             snapshots of the map with legends and timestamps. Continuous data
             updates every five days ensure you always have the latest insights
-            for optimal harvest timing.
+            for optimal harvest timing. All images are credited to the
+            respective sources.
           </p>
           <a
             href="/check-harvest"

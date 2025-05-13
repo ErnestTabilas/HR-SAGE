@@ -59,11 +59,11 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   const stageInfo = [
     { name: "Germination", color: "bg-red-500", range: "(0.2 - 0.39)" },
     { name: "Tillering", color: "bg-orange-500", range: "(0.4 - 0.59)" },
-    { name: "Grand Growth", color: "bg-violet-500", range: "(0.6 - 0.79)" },
+    { name: "Grand Growth", color: "bg-violet-500", range: "(0.6 - 0.85)" },
     {
       name: "Ripening (HARVEST-READY)",
       color: "bg-blue-500",
-      range: "(0.8 -0.9)",
+      range: "(0.3 -0.7)",
     },
   ];
 

@@ -42,16 +42,16 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def classify_growth_stage(ndvi, n_tallmonths):
     if ndvi < 0.2 or n_tallmonths < 1:
-        return None  # Discard noisy or sparse detections
-    elif 0.2 <= ndvi < 0.4 and n_tallmonths >= 1:
+        return None  # Noise or very early growth
+    elif 0.2 <= ndvi < 0.4 and n_tallmonths <= 1:
         return "Germination"
-    elif 0.4 <= ndvi < 0.6 and n_tallmonths >= 2:
+    elif 0.4 <= ndvi < 0.6 and 2 <= n_tallmonths < 4:
         return "Tillering"
-    elif 0.6 <= ndvi < 0.8 and n_tallmonths >= 4:
+    elif 0.6 <= ndvi < 0.85 and 4 <= n_tallmonths < 7:
         return "Grand Growth"
-    elif ndvi >= 0.8 and n_tallmonths >= 6:
+    elif 0.3 <= ndvi < 0.7 and n_tallmonths >= 6:
         return "Ripening"
-    return None  # Inconsistent combination
+    return None
 
 @app.route("/sugarcane-locations", methods=["GET"])
 def sugarcane_locations():
