@@ -59,7 +59,7 @@ def sugarcane_locations():
     try:
         # --- Parse query params ---
         page = int(request.args.get("page", 0))
-        page_size = int(request.args.get("page_size", 100000))
+        page_size = int(request.args.get("page_size", 50000))
         offset = page * page_size
 
         response = supabase\
