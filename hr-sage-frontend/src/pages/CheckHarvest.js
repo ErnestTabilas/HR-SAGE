@@ -378,6 +378,9 @@ const CheckHarvest = () => {
 
           allData = [...allData, ...points];
           setLocations(allData);
+          console.log(
+            `Page ${currentPage} fetched (${points.length} rows). Total: ${allData.length}`
+          );
 
           // Check if there is more data to load
           hasMoreData = res.data.has_more === true; // Assuming the API returns 'has_more'
@@ -390,6 +393,7 @@ const CheckHarvest = () => {
           break;
         }
       }
+      console.log(`All data ${allData}`);
       setLoading(false);
     };
 
