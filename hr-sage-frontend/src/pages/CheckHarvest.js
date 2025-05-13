@@ -20,7 +20,7 @@ import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:5000";
-const TOTAL_ROWS = 912353; // FOR TESTING PURPOSES ONLY
+// const TOTAL_ROWS = 912353; // FOR TESTING PURPOSES ONLY
 let cachedLocations = null;
 
 const getColor = (stage) => {
@@ -44,12 +44,24 @@ const tileLayers = {
     attribution: "&copy; OpenStreetMap contributors",
   },
   terrain: {
-    url: "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
-    attribution: "&copy; OpenTopoMap contributors",
+    url: "https://tiles.stadiamaps.com/tiles/stamen_terrain_background/{z}/{x}/{y}{r}.png",
+    attribution:
+      '&copy; <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a>, <a href="https://www.stamen.com/" target="_blank">Stamen Design</a>, <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a>, <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
   },
-  topographic: {
-    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
-    attribution: "&copy; Esri, FAO, NOAA, USGS, U.S. Navy, NGA, GEBCO, GIBS",
+  world: {
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    attribution:
+      "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community",
+  },
+  satellite: {
+    url: "https://tiles.stadiamaps.com/tiles/alidade_satellite/{z}/{x}/{y}{r}.jpg",
+    attribution:
+      '&copy; CNES, Airbus DS, PlanetObserver (Contains Copernicus Data) | <a href="https://www.stadiamaps.com/" target="_blank">Stadia Maps</a>, <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a>, <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
+  },
+  dark: {
+    url: "https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png",
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
   },
 };
 
@@ -124,7 +136,8 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
           respective growth stages via NDVI pixel overlays. Click a pixel to
           view stage & harvest readiness. Click on the colored ellipses on the
           Legend panel to toggle which sugarcane growth stage to display on the
-          map. You can also download a PDF of the map with the
+          map. You can also download a PDF of map summary. Select a different
+          map tileset on dropdown menu on the upper right corner of the map.
         </p>
       </div>
     </div>
@@ -326,11 +339,12 @@ const CheckHarvest = () => {
     "⏳ Please wait patiently as large data is being loaded.",
     "🕒 Loading may take 2-3 minutes.",
     "💡 Tip: Click on sugarcane points to see details.",
-    "🧭 Tip: Use the search bar to zoom.",
-    "🔍 Tip: Toggle stages in the legend.",
-    "🧭 Tip: If the map fails to load within 5 mins. Reload the page.",
+    "🔎 Tip: Use the search bar to zoom.",
+    "🔴🟠🟣🔵 Tip: Toggle stages in the legend.",
+    "🗺️ Tip: Change map tileset on the dropdown menu on the upper right corner.",
+    "🔃 Tip: If the map fails to load within 5 mins. Reload the page.",
     "🌱 Germination (NDVI = 0.2–0.4): Early growth.",
-    "🌾 Ripening (NDVI >= 0.8): Ready for harvest soon.",
+    "🌾 Ripening: Ready for harvest soon.",
     "🗓️ Data updates every 5 days.",
   ];
 
@@ -362,8 +376,8 @@ const CheckHarvest = () => {
       let allData = [];
       let currentPage = 0;
       let hasMoreData = true;
-      // Check if more data is available
-      while (allData != TOTAL_ROWS) {
+      // Check if more data is available (allData != TOTAL_ROWS)
+      while (hasMoreData) {
         try {
           const res = await axios.get(`${API_BASE_URL}/sugarcane-locations`, {
             params: { page: currentPage },
@@ -372,14 +386,18 @@ const CheckHarvest = () => {
 
           const points = Array.isArray(res.data.points) ? res.data.points : [];
 
-          allData = [...allData, ...points];
-          setLocations(allData);
-          console.log(
-            `Page ${currentPage} fetched (${points.length} rows). Total: ${allData.length}`
-          );
+          if (points.length === 0) {
+            console.log("All data successfully loaded.");
+            hasMoreData = false; // No more data to load
+          } else {
+            allData = [...allData, ...points];
+            setLocations(allData);
+            console.log(
+              `Page ${currentPage} fetched (${points.length} rows). Total: ${allData.length}`
+            );
+          }
 
           // Check if there is more data to load
-
           hasMoreData = Boolean(res.data.has_more);
           currentPage += 1; // Move to the next page
 
@@ -390,7 +408,7 @@ const CheckHarvest = () => {
           break;
         }
       }
-      console.log(`All data ${allData}`);
+
       setLoading(false);
     };
 
@@ -706,14 +724,16 @@ const CheckHarvest = () => {
                 value={basemap}
                 onChange={(e) => setBasemap(e.target.value)}
               >
-                <option value="street">🚗</option>
                 <option value="terrain">🏔️</option>
-                <option value="topographic">🗺️</option>
+                <option value="world">🌍</option>
+                <option value="satellite">🛰️</option>
+                <option value="street">🚗</option>
+                <option value="dark">🌙</option>
               </select>
             </div>
           </div>
         )}
-        {/* {error && (
+        {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-white z-[1000]">
             <div className="text-center">
               <XCircle className="mx-auto text-red-500 w-12 h-12" />
@@ -723,7 +743,7 @@ const CheckHarvest = () => {
               <p className="text-gray-500">Please reload the page.</p>
             </div>
           </div>
-        )} */}
+        )}
       </div>
     </div>
   );

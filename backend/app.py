@@ -55,10 +55,11 @@ def classify_growth_stage(ndvi, n_tallmonths):
 
 @app.route("/sugarcane-locations", methods=["GET"])
 def sugarcane_locations():
+    has_more = True
     try:
         # --- Parse query params ---
         page = int(request.args.get("page", 0))
-        page_size = int(request.args.get("page_size", 9000))
+        page_size = int(request.args.get("page_size", 100000))
         offset = page * page_size
 
         response = supabase\
@@ -69,37 +70,29 @@ def sugarcane_locations():
             .order("lat")\
             .range(offset, offset + page_size - 1)\
             .execute()
-
-         # Get the total count of rows in the database
-        total_count_response = supabase\
-            .table(TABLE_NAME)\
-            .select("count")\
-            .execute()
-
-        total_count = total_count_response.data[0].get("count", 0) if total_count_response.data else 0
         
         results = []
+        if len(response.data) == 0:
+            has_more = False
+        else:
+            for row in response.data:
+                lat, lng = row.get("lat"), row.get("lng")
+                ndvi = row.get("ndvi")
+                n_tallmonths = row.get("n_tallmonths")
 
-        for row in response.data:
-            lat, lng = row.get("lat"), row.get("lng")
-            ndvi = row.get("ndvi")
-            n_tallmonths = row.get("n_tallmonths")
+                # Sanity check
+                if not (-90 <= lat <= 90 and -180 <= lng <= 180):
+                    continue
 
-            # Sanity check
-            if not (-90 <= lat <= 90 and -180 <= lng <= 180):
-                continue
-
-            stage = classify_growth_stage(ndvi, n_tallmonths)
-            if stage:
-                results.append({
-                    "lat": lat,
-                    "lng": lng,
-                    "ndvi": ndvi,
-                    "n_tallmonths": n_tallmonths,
-                    "growth_stage": stage
-                })
-
-        has_more = (offset + len(response.data)) < total_count
+                stage = classify_growth_stage(ndvi, n_tallmonths)
+                if stage:
+                    results.append({
+                        "lat": lat,
+                        "lng": lng,
+                        "ndvi": ndvi,
+                        "n_tallmonths": n_tallmonths,
+                        "growth_stage": stage
+                    })
 
         return jsonify({
             "page": page,
