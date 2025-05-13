@@ -58,7 +58,7 @@ def sugarcane_locations():
     try:
         # --- Parse query params ---
         page = int(request.args.get("page", 0))
-        page_size = int(request.args.get("page_size", 5000))
+        page_size = int(request.args.get("page_size", 1000))
         offset = page * page_size
 
         response = supabase\
@@ -145,5 +145,5 @@ def sugarcane_locations():
 if __name__ == '__main__':
     import os
     port = int(os.environ.get('PORT', 5000))  # Render provides PORT env var
-    app.run(host='0.0.0.0', port=port)
+
     logging.info(f"Server running on port {port}")

@@ -60,11 +60,7 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
     { name: "Germination", color: "bg-red-500", range: "(0.2 - 0.39)" },
     { name: "Tillering", color: "bg-orange-500", range: "(0.4 - 0.59)" },
     { name: "Grand Growth", color: "bg-violet-500", range: "(0.6 - 0.85)" },
-    {
-      name: "Ripening (HARVEST-READY)",
-      color: "bg-blue-500",
-      range: "(0.3 -0.7)",
-    },
+    { name: "Ripening", color: "bg-blue-500", range: "(0.3 -0.7)" },
   ];
 
   return (
@@ -371,7 +367,7 @@ const CheckHarvest = () => {
         try {
           const res = await axios.get(`${API_BASE_URL}/sugarcane-locations`, {
             params: { page: currentPage },
-            timeout: 500000, // 500 seconds
+            timeout: 5000000, // 5000 seconds
           });
 
           const points = Array.isArray(res.data.points) ? res.data.points : [];
@@ -383,7 +379,8 @@ const CheckHarvest = () => {
           );
 
           // Check if there is more data to load
-          hasMoreData = res.data.has_more === true; // Assuming the API returns 'has_more'
+
+          hasMoreData = Boolean(res.data.has_more);
           currentPage += 1; // Move to the next page
 
           await new Promise((resolve) => setTimeout(resolve, 100));
@@ -601,7 +598,7 @@ const CheckHarvest = () => {
                 }}
               />
               <Text style={pdfStyles.legendLabel}>
-                Ripening READY FOR HARVEST (NDVI 0.8-above)
+                Ripening HARVEST-READY (NDVI 0.8-above)
               </Text>
             </View>
           </View>
@@ -716,7 +713,7 @@ const CheckHarvest = () => {
             </div>
           </div>
         )}
-        {error && (
+        {/* {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-white z-[1000]">
             <div className="text-center">
               <XCircle className="mx-auto text-red-500 w-12 h-12" />
@@ -726,7 +723,7 @@ const CheckHarvest = () => {
               <p className="text-gray-500">Please reload the page.</p>
             </div>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );
