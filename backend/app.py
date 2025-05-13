@@ -8,7 +8,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from datetime import datetime
 
-# ---- Setup ----
+# ---- Setup -----
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
 CORS(app, origins=["https://hr-sage.vercel.app", "http://localhost:3000"])
