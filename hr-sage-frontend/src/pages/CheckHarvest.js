@@ -20,7 +20,7 @@ import "leaflet/dist/leaflet.css";
 import axios from "axios";
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || "http://127.0.0.1:5000";
-
+const TOTAL_ROWS = 912353; // FOR TESTING PURPOSES ONLY
 let cachedLocations = null;
 
 const getColor = (stage) => {
@@ -363,7 +363,7 @@ const CheckHarvest = () => {
       let currentPage = 0;
       let hasMoreData = true;
       // Check if more data is available
-      while (hasMoreData) {
+      while (allData != TOTAL_ROWS) {
         try {
           const res = await axios.get(`${API_BASE_URL}/sugarcane-locations`, {
             params: { page: currentPage },

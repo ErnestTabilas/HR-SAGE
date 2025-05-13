@@ -42,23 +42,23 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def classify_growth_stage(ndvi, n_tallmonths):
     if ndvi < 0.2 or n_tallmonths < 1:
-        return None  # Noise or very early growth
-    elif 0.2 <= ndvi < 0.4 and n_tallmonths <= 1:
+        return None  # Discard noisy or sparse detections
+    elif 0.2 <= ndvi < 0.4 and n_tallmonths >= 1:
         return "Germination"
-    elif 0.4 <= ndvi < 0.6 and 2 <= n_tallmonths < 4:
+    elif 0.4 <= ndvi < 0.6 and n_tallmonths >= 2:
         return "Tillering"
-    elif 0.6 <= ndvi < 0.85 and 4 <= n_tallmonths < 7:
+    elif 0.6 <= ndvi < 0.8 and n_tallmonths >= 4:
         return "Grand Growth"
-    elif 0.3 <= ndvi < 0.7 and n_tallmonths >= 6:
+    elif ndvi >= 0.8 and n_tallmonths >= 6:
         return "Ripening"
-    return None
+    return None  # Inconsistent combination
 
 @app.route("/sugarcane-locations", methods=["GET"])
 def sugarcane_locations():
     try:
         # --- Parse query params ---
         page = int(request.args.get("page", 0))
-        page_size = int(request.args.get("page_size", 1000))
+        page_size = int(request.args.get("page_size", 9000))
         offset = page * page_size
 
         response = supabase\
@@ -70,6 +70,14 @@ def sugarcane_locations():
             .range(offset, offset + page_size - 1)\
             .execute()
 
+         # Get the total count of rows in the database
+        total_count_response = supabase\
+            .table(TABLE_NAME)\
+            .select("count")\
+            .execute()
+
+        total_count = total_count_response.data[0].get("count", 0) if total_count_response.data else 0
+        
         results = []
 
         for row in response.data:
@@ -91,7 +99,7 @@ def sugarcane_locations():
                     "growth_stage": stage
                 })
 
-        has_more = len(response.data) == page_size
+        has_more = (offset + len(response.data)) < total_count
 
         return jsonify({
             "page": page,
