@@ -64,10 +64,10 @@ const Legend = ({ onSearch, selectedStages, onToggleStage }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
   const stageInfo = [
-    { name: "Germination", color: "bg-red-500", range: "(0.2 - 0.39)" },
-    { name: "Tillering", color: "bg-orange-500", range: "(0.4 - 0.59)" },
-    { name: "Grand Growth", color: "bg-violet-500", range: "(0.6 - 0.85)" },
-    { name: "Ripening", color: "bg-blue-500", range: "(0.3 -0.7)" },
+    { name: "Germination", color: "bg-red-500", range: "(0.25 - 0.34)" },
+    { name: "Tillering", color: "bg-orange-500", range: "(0.35 - 0.54)" },
+    { name: "Grand Growth", color: "bg-violet-500", range: "(0.55 - 1.0)" },
+    { name: "Ripening", color: "bg-blue-500", range: "(0.55 -0.7)" },
   ];
 
   return (
